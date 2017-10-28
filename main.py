@@ -2,7 +2,7 @@ import time
 from collections import namedtuple
 import tensorflow as tf
 
-from architectures import make_translation_generator, make_discriminator
+from disco.architectures import make_translation_generator, make_discriminator
 from input import input_fn, make_preprocessor
 
 
@@ -96,13 +96,15 @@ def disco_gan(input_A, input_B, generator, discriminator, device_mapping):
     opt_DB = optimizer_DB.minimize(loss_dB, var_list=var_DB, global_step=tf.train.get_or_create_global_step(),
                                    colocate_gradients_with_ops=True)
 
-    train_step = tf.group(opt_AB, opt_BA, opt_DA, opt_DB)
+    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+    with tf.control_dependencies(update_ops):
+        train_step = tf.group(opt_AB, opt_BA, opt_DA, opt_DB)
 
     return train_step
 
 
-generator = make_translation_generator(3)
-disc_fn = make_discriminator(3)
+generator = make_translation_generator(4)
+disc_fn = make_discriminator(4)
 preprocess = make_preprocessor(256, 64)
 
 p1 = "trainA/*.jpg"
