@@ -49,8 +49,15 @@ if args.eval:
         return input_pipeline(path, crop_and_resize_image("min", args.image_size) | convert_image(),
                               num_threads=args.input_threads, epochs=1, batch_size=args.batch_size)
 
-    os.makedirs(os.path.dirname(os.path.join(args.out_dir, args.A)), exist_ok=True)
-    os.makedirs(os.path.dirname(os.path.join(args.out_dir, args.B)), exist_ok=True)
+
+    # THIS IS EXTREMELY UGLY
+    # GET PYTHON 3 WORKING AND WE CAN REMOVE IT
+    try:
+        os.makedirs(os.path.dirname(os.path.join(args.out_dir, args.A)), exist_ok=True)
+    except: pass
+    try:
+        os.makedirs(os.path.dirname(os.path.join(args.out_dir, args.B)), exist_ok=True)
+    except: pass
 
     with tf.Graph().as_default():
         train_disco = disco_gan(input_fn(pA), input_fn(pB), generator, discriminator, devices, 1000, is_training=False)

@@ -155,7 +155,7 @@ def _generator_loss(discriminator_logit, fake_features, real_features, real, rec
                                                       scope="reconstruct")
         tf.summary.scalar("reconstruction", reconstruction)
 
-        total = (feature_matching + discrimination) * (1.0 - rate) + rate * reconstruction
+        total = (feature_matching + 0.1*discrimination) * (1.0 - rate) + rate * reconstruction
         tf.summary.scalar("total", total)
     return total
 
