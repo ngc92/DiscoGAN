@@ -3,7 +3,24 @@ from collections import namedtuple
 import tensorflow as tf
 
 
-def disco_gan(input_A, input_B, generator, discriminator, device_mapping):
+def disco_gan(input_A, input_B, generator, discriminator, device_mapping, generator_AB=None, generator_BA=None,
+              discriminator_A=None, discriminator_B=None):
+    if generator_AB is None:
+        generator_AB = generator
+
+    if generator_BA is None:
+        generator_BA = generator
+
+    if discriminator_A is None:
+        discriminator_A = discriminator
+
+    if discriminator_B is None:
+        discriminator_B = discriminator
+
+    return _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, discriminator_B, device_mapping)
+
+
+def _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, discriminator_B, device_mapping):
     # create and summarize the inputs
     with tf.device(device_mapping.input):
         A = input_A()
@@ -13,34 +30,34 @@ def disco_gan(input_A, input_B, generator, discriminator, device_mapping):
 
     # create and summarize fakes
     with tf.device(device_mapping.genA), tf.variable_scope("genA"):
-        fA = generator(B)
+        fA = generator_BA(B)
         tf.summary.image("fA", fA)
 
     with tf.device(device_mapping.genB), tf.variable_scope("genB"):
-        fB = generator(A)
+        fB = generator_AB(A)
         tf.summary.image("fB", fB)
 
     # reconstruction
     with tf.device(device_mapping.genA), tf.variable_scope("genA", reuse=True):
-        rA = generator(fB)
+        rA = generator_BA(fB)
         tf.summary.image("rA", rA)
 
     with tf.device(device_mapping.genB), tf.variable_scope("genB", reuse=True):
-        rB = generator(fA)
+        rB = generator_AB(fA)
         tf.summary.image("rB", rB)
 
     # discriminators
     with tf.device(device_mapping.disA), tf.variable_scope("disA"):
-        dfA = discriminator(fA)
+        dfA = discriminator_A(fA)
 
     with tf.device(device_mapping.disA), tf.variable_scope("disA", reuse=True):
-        drA = discriminator(A)
+        drA = discriminator_A(A)
 
     with tf.device(device_mapping.disB), tf.variable_scope("disB"):
-        dfB = discriminator(fB)
+        dfB = discriminator_B(fB)
 
     with tf.device(device_mapping.disB), tf.variable_scope("disB", reuse=True):
-        drB = discriminator(B)
+        drB = discriminator_B(B)
 
     # now all the loss terms
     with tf.name_scope("DA_loss"):
