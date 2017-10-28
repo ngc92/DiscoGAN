@@ -35,7 +35,7 @@ def disco_gan(input_A, input_B, generator, discriminator, device_mapping, curric
                       wrap(discriminator_B), device_mapping, curriculum, is_training)
 
 
-def feature_matching(fake, real, scope="feature_matching"):
+def _feature_matching(fake, real, scope="feature_matching"):
     with tf.name_scope(scope):
         losses = []
         for f, r in zip(fake, real):
@@ -104,22 +104,9 @@ def _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, di
     rate = tf.cond(tf.greater(tf.train.get_or_create_global_step(), curriculum),
                    lambda: tf.constant(0.5), lambda: tf.constant(0.01))
 
-    with tf.name_scope("GAB_loss"):
-        gdB_l = tf.losses.sigmoid_cross_entropy(tf.ones_like(dfB), dfB, scope="discrimination_loss",
-                                                reduction=tf.losses.Reduction.MEAN)
-        gfB_l = tf.add_n(feature_matching(dffB, drfB))
-        gcB_l = tf.losses.mean_squared_error(B, rB, reduction=tf.losses.Reduction.MEAN, scope="reconstruction_loss")
-        loss_AB = (gfB_l + gdB_l) * (1.0 - rate) + rate*gcB_l
+    loss_AB = _generator_loss(dfB, dffB, drfB, B, rB, rate, "GAB_loss")
+    loss_BA = _generator_loss(dfA, dffA, drfA, A, rA, rate, "GBA_loss")
 
-    with tf.name_scope("GBA_loss"):
-        gcA_l = tf.losses.mean_squared_error(A, rA, reduction=tf.losses.Reduction.MEAN, scope="reconstruction_loss")
-        gfA_l = tf.add_n(feature_matching(dffB, drfB))
-        gdA_l = tf.losses.sigmoid_cross_entropy(tf.ones_like(dfA), dfA, scope="discrimination_loss",
-                                                reduction=tf.losses.Reduction.MEAN)
-        loss_BA = (gfA_l + gdA_l) * (1.0 - rate) + rate*gcA_l
-
-    tf.summary.scalar("loss_AB", loss_AB)
-    tf.summary.scalar("loss_BA", loss_BA)
     tf.summary.scalar("loss_dA", loss_dA)
     tf.summary.scalar("loss_dB", loss_dB)
 
@@ -150,6 +137,27 @@ def _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, di
         train_step = tf.group(opt_AB, opt_BA, opt_DA, opt_DB)
 
     return DiscoGan(train_step=train_step, realA=A, realB=B, fakeA=fA, fakeB=fB, file_name_A=file_A, file_name_B=file_B)
+
+
+def _generator_loss(discriminator_logit, fake_features, real_features, real, reconstructed, rate, scope):
+    with tf.name_scope(scope):
+        # discrimination loss
+        discrimination = tf.losses.sigmoid_cross_entropy(tf.ones_like(discriminator_logit), discriminator_logit,
+                                                         scope="discriminate", reduction=tf.losses.Reduction.MEAN)
+        tf.summary.scalar("discrimination", discrimination)
+
+        # feature matching loss
+        feature_matching = tf.add_n(_feature_matching(fake_features, real_features, "matching"))
+        tf.summary.scalar("feature_matching", feature_matching)
+
+        # reconstruction loss
+        reconstruction = tf.losses.mean_squared_error(real, reconstructed, reduction=tf.losses.Reduction.MEAN,
+                                                      scope="reconstruct")
+        tf.summary.scalar("reconstruction", reconstruction)
+
+        total = (feature_matching + discrimination) * (1.0 - rate) + rate * reconstruction
+        tf.summary.scalar("total", total)
+    return total
 
 
 DeviceMapping = namedtuple("DeviceMapping", ("input", "genA", "genB", "disA", "disB"))
