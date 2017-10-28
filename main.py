@@ -1,4 +1,5 @@
 import time
+import os
 import argparse
 import tensorflow as tf
 
@@ -8,10 +9,12 @@ from disco.models import make_translation_generator, make_discriminator
 
 # CLI
 parser = argparse.ArgumentParser()
-parser.add_argument("--dataA", default="trainA/*")
-parser.add_argument("--dataB", default="trainB/*")
+parser.add_argument("--data-dir", default="ckpt")
+parser.add_argument("--checkpoint-dir", default="")
+parser.add_argument("--A", default="trainA/*")
+parser.add_argument("--B", default="trainB/*")
 parser.add_argument("--epochs", default=100)
-parser.add_argument("--input-threads", default=1)
+parser.add_argument("--input-threads", default=2)
 parser.add_argument("--image-size", default=64)
 parser.add_argument("--batch-size", default=32)
 parser.add_argument("--GPUs", default=1)
@@ -35,11 +38,13 @@ def input_fn(path):
     return input_pipeline(path, preprocess, num_threads=args.input_threads, epochs=args.epochs,
                           batch_size=args.batch_size)
 
-with tf.Graph().as_default():
-    with tf.device("/cpu:0"):
-        train_disco = disco_gan(input_fn(args.dataA), input_fn(args.dataB), generator, discriminator, devices)
+pA = os.path.join(args.data_dir, args.A)
+pB = os.path.join(args.data_dir, args.B)
 
-    with tf.train.MonitoredTrainingSession(checkpoint_dir="test", save_summaries_steps=25,
+with tf.Graph().as_default():
+    train_disco = disco_gan(input_fn(pA), input_fn(pB), generator, discriminator, devices)
+
+    with tf.train.MonitoredTrainingSession(checkpoint_dir=args.checkpoint_dir, save_summaries_steps=25,
                                            config=tf.ConfigProto(allow_soft_placement=True)) as sess:
         while True:
             t = time.time()
