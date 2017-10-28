@@ -21,6 +21,11 @@ def make_translation_generator(layers, channels=3, stride=2, encoding_noise=None
     def generator(image, conditioning, is_training=True):
         # Encoder
         hidden = image
+        if encoding_noise is not None and encoding_noise > 0:
+            in_shape = hidden.shape.as_list()
+            noise = tf.random_normal([tf.shape(hidden)[0], in_shape[1], in_shape[2], encoding_noise])
+            hidden = tf.concat([hidden, noise], axis=3)
+
         for layer in range(layers):
             hidden = tf.layers.conv2d(hidden, 64 * 2**layer, kernel_size=4, strides=stride,
                                       padding="SAME", use_bias=False)
@@ -29,11 +34,6 @@ def make_translation_generator(layers, channels=3, stride=2, encoding_noise=None
 
             # apply the nonlinearity after batch-norm. No idea if this is relevant
             hidden = lrelu(hidden)
-
-        if encoding_noise is not None and encoding_noise > 0:
-            in_shape = hidden.shape.as_list()
-            noise = tf.random_normal([tf.shape(hidden)[0], in_shape[1], in_shape[2], encoding_noise])
-            hidden = tf.concat([hidden, noise], axis=3)
 
         # Decoder
         for layer in range(layers-1):
