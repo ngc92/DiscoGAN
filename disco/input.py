@@ -1,22 +1,53 @@
 import tensorflow as tf
 
 
-def convert_image(image):
+class Pipe:
+    def __init__(self, f):
+        self.f = f
+
+    def __call__(self, *args, **kwargs):
+        return self.f(*args, **kwargs)
+
+    def __or__(self, g):
+        f = self.f
+
+        def chained(*args, **kwargs):
+            return g(f(*args, **kwargs))
+        return Pipe(chained)
+
+
+def convert_image():
     """ transform to float in [-1, 1] """
-    return (tf.cast(image, tf.float32) / 255.0) * 2.0 - 1.0
+    def f(image):
+        return (tf.cast(image, tf.float32) / 255.0) * 2.0 - 1.0
+    return Pipe(f)
 
 
-def make_preprocessor(crop_size=108, image_size=64):
-    def preprocess_images(image):
+def crop_and_resize_image(crop_size, image_size):
+    def f(image):
         # cropping and resizing
-        cropped = tf.image.resize_image_with_crop_or_pad(image, crop_size, crop_size)
-        resized = tf.image.resize_images(cropped, [image_size, image_size])
-        resized = image
-        resized.set_shape([image_size, image_size, 3])
+        if crop_size == "min":
+            cropping = tf.minimum(tf.shape(image)[0], tf.shape(image)[1])
+        elif crop_size == "max":
+            cropping = tf.maximum(tf.shape(image)[0], tf.shape(image)[1])
+        else:
+            cropping = crop_size
 
-        # transform to float in [-1, 1]
-        return convert_image(resized)
-    return preprocess_images
+        cropped = tf.image.resize_image_with_crop_or_pad(image, cropping, cropping)
+        resized = tf.image.resize_images(cropped, [image_size, image_size])
+        resized.set_shape([image_size, image_size, 3])
+        return tf.cast(resized, tf.uint8)
+    return Pipe(f)
+
+
+def augment_with_flips(horizontal=True, vertical=False):
+    def f(image):
+        if horizontal:
+            image = tf.image.random_flip_left_right(image)
+        if vertical:
+            image = tf.image.random_flip_up_down(image)
+        return image
+    return Pipe(f)
 
 
 def read_image_files(pattern, repeat=1):
@@ -28,7 +59,7 @@ def read_image_files(pattern, repeat=1):
     return file_name, image
 
 
-def input_fn(pattern, preprocessing, batch_size=32, num_threads=2, epochs=100):
+def input_pipeline(pattern, preprocessing, batch_size=32, num_threads=2, epochs=100):
     def input_fn():
         with tf.variable_scope("input_fn"):
             file_name, image = read_image_files(pattern, epochs)
