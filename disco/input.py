@@ -65,7 +65,7 @@ def input_pipeline(pattern, preprocessing, batch_size=32, num_threads=2, epochs=
             file_name, image = read_image_files(pattern, epochs)
 
             image = preprocessing(image)
-            return tf.train.shuffle_batch([image], batch_size=batch_size, capacity=200, min_after_dequeue=10,
+            return tf.train.shuffle_batch([image, file_name], batch_size=batch_size, capacity=200, min_after_dequeue=10,
                                           num_threads=num_threads)
     return input_fn
 

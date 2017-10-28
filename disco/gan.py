@@ -4,6 +4,9 @@ from functools import wraps
 import tensorflow as tf
 
 
+DiscoGan = namedtuple("DiscoGan", ["train_step", "realA", "fakeA", "realB", "fakeB", "file_name_A", "file_name_B"])
+
+
 def disco_gan(input_A, input_B, generator, discriminator, device_mapping, is_training=True, generator_AB=None,
               generator_BA=None, discriminator_A=None, discriminator_B=None):
     if generator_AB is None:
@@ -47,8 +50,8 @@ def _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, di
                is_training):
     # create and summarize the inputs
     with tf.device(device_mapping.input):
-        A = input_A()
-        B = input_B()
+        A, file_A = input_A()
+        B, file_B = input_B()
         tf.summary.image("A", A)
         tf.summary.image("B", B)
 
@@ -143,7 +146,7 @@ def _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, di
     with tf.control_dependencies(update_ops):
         train_step = tf.group(opt_AB, opt_BA, opt_DA, opt_DB)
 
-    return train_step
+    return DiscoGan(train_step=train_step, realA=A, realB=B, fakeA=fA, fakeB=fB, file_name_A=file_A, file_name_B=file_B)
 
 
 DeviceMapping = namedtuple("DeviceMapping", ("input", "genA", "genB", "disA", "disB"))

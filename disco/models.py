@@ -17,8 +17,8 @@ def lrelu(x):
         return tf.maximum(x, 0.2 * x)
 
 
-def make_translation_generator(layers, channels=3, stride=2, is_training=True):
-    def generator(image):
+def make_translation_generator(layers, channels=3, stride=2):
+    def generator(image, is_training=True):
         # Encoder
         hidden = image
         for layer in range(layers):
@@ -44,8 +44,8 @@ def make_translation_generator(layers, channels=3, stride=2, is_training=True):
     return generator
 
 
-def make_discriminator(layers, is_training=True):
-    def discriminator(image):
+def make_discriminator(layers):
+    def discriminator(image, is_training=True):
         hidden = image
         features = []
         for layer in range(layers):
