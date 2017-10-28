@@ -27,9 +27,9 @@ parser.add_argument("--out-dir", default="result", type=str)
 
 args = parser.parse_args()
 
-generator = make_translation_generator(args.generator_depth)
+generator = make_translation_generator(args.generator_depth, shortcuts=True)
 discriminator = make_discriminator(args.discriminator_depth)
-preprocess = crop_and_resize_image("min", args.image_size) | augment_with_flips() | convert_image()
+preprocess = crop_and_resize_image("min", args.image_size) | augment_with_flips(vertical=True) | convert_image()
 
 if args.GPUs == 0:
     devices = DeviceMapping("/cpu:0", "/cpu:0", "/cpu:0", "/cpu:0", "/cpu:0")

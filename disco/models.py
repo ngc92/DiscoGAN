@@ -17,14 +17,11 @@ def lrelu(x):
         return tf.maximum(x, 0.2 * x)
 
 
-def make_translation_generator(layers, channels=3, stride=2, encoding_noise=None):
-    def generator(image, conditioning, is_training=True):
+def make_translation_generator(layers, channels=3, stride=2, encoding_noise=None, shortcuts=False):
+    def generator(image, is_training=True):
         # Encoder
         hidden = image
-        if encoding_noise is not None and encoding_noise > 0:
-            in_shape = hidden.shape.as_list()
-            noise = tf.random_normal([tf.shape(hidden)[0], in_shape[1], in_shape[2], encoding_noise])
-            hidden = tf.concat([hidden, noise], axis=3)
+        encodings = []
 
         for layer in range(layers):
             hidden = tf.layers.conv2d(hidden, 64 * 2**layer, kernel_size=4, strides=stride,
@@ -34,14 +31,26 @@ def make_translation_generator(layers, channels=3, stride=2, encoding_noise=None
 
             # apply the nonlinearity after batch-norm. No idea if this is relevant
             hidden = lrelu(hidden)
+            encodings += [hidden]
+
+        # add some noise to the encoding
+        # TODO figure out whether this makes sense
+        if encoding_noise is not None and encoding_noise > 0:
+            in_shape = hidden.shape.as_list()
+            noise = tf.random_normal([tf.shape(hidden)[0], in_shape[1], in_shape[2], encoding_noise])
+            hidden = tf.concat([hidden, noise], axis=3)
 
         # Decoder
         for layer in range(layers-1):
+            if layer > 0 and shortcuts:
+                hidden = tf.concat([hidden, encodings[layers - layer - 1]], axis=3)
             hidden = tf.layers.conv2d_transpose(hidden, 64 * 2**(layers - layer - 2), kernel_size=4, strides=stride,
                                                 padding="SAME", use_bias=False)
             hidden = tf.layers.batch_normalization(hidden, training=is_training)
             hidden = tf.nn.relu(hidden)
 
+        if shortcuts:
+            hidden = tf.concat([hidden, encodings[0]], axis=3)
         new_image = tf.layers.conv2d_transpose(hidden, channels, kernel_size=4, strides=stride, activation=tf.nn.tanh,
                                                padding="SAME", use_bias=False)
 

@@ -40,6 +40,15 @@ def crop_and_resize_image(crop_size, image_size):
     return Pipe(f)
 
 
+def random_crop(crop_size, image_size):
+    def f(image):
+        cropped = tf.random_crop(image, [crop_size, crop_size, 3])
+        resized = tf.image.resize_images(cropped, [image_size, image_size])
+        resized.set_shape([image_size, image_size, 3])
+        return tf.cast(resized, tf.uint8)
+    return Pipe(f)
+
+
 def augment_with_flips(horizontal=True, vertical=False):
     def f(image):
         if horizontal:
