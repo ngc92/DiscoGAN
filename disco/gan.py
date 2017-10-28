@@ -47,14 +47,14 @@ def disco_gan(input_A, input_B, generator, discriminator, device_mapping):
         dfA_l = tf.losses.sigmoid_cross_entropy(tf.zeros_like(dfA), logits=dfA, scope="fake_loss",
                                                 reduction=tf.losses.Reduction.MEAN)
         drA_l = tf.losses.sigmoid_cross_entropy(tf.ones_like(drA), drA, scope="real_loss",
-                                                reduction=tf.losses.Reduction.MEAN)
+                                                reduction=tf.losses.Reduction.MEAN, label_smoothing=0.1)
         loss_dA = drA_l + dfA_l
 
     with tf.name_scope("DB_loss"):
         dfB_l = tf.losses.sigmoid_cross_entropy(tf.zeros_like(dfB), dfB, scope="fake_loss",
                                                 reduction=tf.losses.Reduction.MEAN)
         drB_l = tf.losses.sigmoid_cross_entropy(tf.ones_like(drB), drB, scope="real_loss",
-                                                reduction=tf.losses.Reduction.MEAN)
+                                                reduction=tf.losses.Reduction.MEAN, label_smoothing=0.1)
         loss_dB = drB_l + dfB_l
 
     with tf.name_scope("GAB_loss"):
@@ -87,8 +87,8 @@ def disco_gan(input_A, input_B, generator, discriminator, device_mapping):
 
     optimizer_GAB = tf.train.AdamOptimizer(learning_rate=0.0002, beta1=0.5, beta2=0.999)
     optimizer_GBA = tf.train.AdamOptimizer(learning_rate=0.0002, beta1=0.5, beta2=0.999)
-    optimizer_DA = tf.train.AdamOptimizer(learning_rate=0.00002, beta1=0.5, beta2=0.999)
-    optimizer_DB = tf.train.AdamOptimizer(learning_rate=0.00002, beta1=0.5, beta2=0.999)
+    optimizer_DA = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.999)
+    optimizer_DB = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.999)
 
     opt_AB = optimizer_GAB.minimize(loss_AB, var_list=var_GAB, colocate_gradients_with_ops=True)
     opt_BA = optimizer_GBA.minimize(loss_BA, var_list=var_GBA, colocate_gradients_with_ops=True)

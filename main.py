@@ -18,10 +18,12 @@ parser.add_argument("--input-threads", default=2, type=int)
 parser.add_argument("--image-size", default=64, type=int)
 parser.add_argument("--batch-size", default=32, type=int)
 parser.add_argument("--GPUs", default=1, type=int)
+parser.add_argument("--generator-depth", default=3, type=int)
+parser.add_argument("--discriminator-depth", default=3, type=int)
 args = parser.parse_args()
 
-generator = make_translation_generator(4)
-discriminator = make_discriminator(4)
+generator = make_translation_generator(args.generator_depth)
+discriminator = make_discriminator(args.discriminator_depth)
 preprocess = crop_and_resize_image("min", args.image_size) | augment_with_flips() | convert_image()
 
 if args.GPUs == 0:
