@@ -23,15 +23,16 @@ def make_translation_generator(layers, channels=3, stride=2, encoding_noise=None
         hidden = image
         encodings = []
 
-        for layer in range(layers):
-            hidden = tf.layers.conv2d(hidden, 64 * 2**layer, kernel_size=4, strides=stride,
-                                      padding="SAME", use_bias=False)
-            if layer > 0:
-                hidden = tf.layers.batch_normalization(hidden, training=is_training)
+        with tf.variable_scope("encoder"):
+            for layer in range(layers):
+                hidden = tf.layers.conv2d(hidden, 64 * 2**layer, kernel_size=4, strides=stride,
+                                          padding="SAME", use_bias=False, name="conv%i" % layer)
+                if layer > 0:
+                    hidden = tf.layers.batch_normalization(hidden, training=is_training, name="batchnorm%i" % layer)
 
-            # apply the nonlinearity after batch-norm. No idea if this is relevant
-            hidden = lrelu(hidden)
-            encodings += [hidden]
+                # apply the nonlinearity after batch-norm. No idea if this is relevant
+                hidden = lrelu(hidden)
+                encodings += [hidden]
 
         # add some noise to the encoding
         # TODO figure out whether this makes sense
@@ -41,18 +42,19 @@ def make_translation_generator(layers, channels=3, stride=2, encoding_noise=None
             hidden = tf.concat([hidden, noise], axis=3)
 
         # Decoder
-        for layer in range(layers-1):
-            if layer > 0 and shortcuts:
-                hidden = tf.concat([hidden, encodings[layers - layer - 1]], axis=3)
-            hidden = tf.layers.conv2d_transpose(hidden, 64 * 2**(layers - layer - 2), kernel_size=4, strides=stride,
-                                                padding="SAME", use_bias=False)
-            hidden = tf.layers.batch_normalization(hidden, training=is_training)
-            hidden = tf.nn.relu(hidden)
+        with tf.variable_scope("decoder"):
+            for layer in range(layers-1):
+                if layer > 0 and shortcuts:
+                    hidden = tf.concat([hidden, encodings[layers - layer - 1]], axis=3)
+                hidden = tf.layers.conv2d_transpose(hidden, 64 * 2**(layers - layer - 2), kernel_size=4, strides=stride,
+                                                    padding="SAME", use_bias=False, name="deconv%i" % layer)
+                hidden = tf.layers.batch_normalization(hidden, training=is_training, name="batchnorm%i" % layer)
+                hidden = tf.nn.relu(hidden)
 
-        if shortcuts:
-            hidden = tf.concat([hidden, encodings[0]], axis=3)
-        new_image = tf.layers.conv2d_transpose(hidden, channels, kernel_size=4, strides=stride, activation=tf.nn.tanh,
-                                               padding="SAME", use_bias=False)
+            if shortcuts:
+                hidden = tf.concat([hidden, encodings[0]], axis=3)
+            new_image = tf.layers.conv2d_transpose(hidden, channels, kernel_size=4, strides=stride, activation=tf.nn.tanh,
+                                                   padding="SAME", use_bias=False, name="deconv%i" % layers)
 
         return new_image
 
@@ -64,15 +66,17 @@ def make_discriminator(layers):
         hidden = image
         features = []
         for layer in range(layers):
-            hidden = tf.layers.conv2d(hidden, 64 * 2**layer, kernel_size=4, strides=2, activation=lrelu)
+            hidden = tf.layers.conv2d(hidden, 64 * 2**layer, kernel_size=4, strides=2, name="conv%i" % layer)
             if layer > 0:
-                features += [hidden]
-                hidden = tf.layers.batch_normalization(hidden, training=is_training)
+                hidden = tf.layers.batch_normalization(hidden, training=is_training, name="batchnorm%i" % layer)
+
+            hidden = lrelu(hidden)
+            features += [hidden]
 
         shape = hidden.shape
         total = np.prod(shape.as_list()[1:])
         flat = tf.reshape(hidden, (-1, total))
         final = tf.layers.dense(flat, 1, use_bias=False)
-        return final, features
+        return final, features[1:]
 
     return discriminator
