@@ -28,7 +28,7 @@ parser.add_argument("--out-dir", default="result", type=str)
 args = parser.parse_args()
 
 generator_AB = make_translation_generator(args.generator_depth)
-generator_BA = make_translation_generator(args.generator_depth, encoding_noise=10)
+generator_BA = make_translation_generator(args.generator_depth, encoding_noise=2)
 discriminator = make_discriminator(args.discriminator_depth)
 preprocess = crop_and_resize_image("min", args.image_size) | augment_with_flips() | convert_image()
 

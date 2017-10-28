@@ -31,10 +31,9 @@ def make_translation_generator(layers, channels=3, stride=2, encoding_noise=None
             hidden = lrelu(hidden)
 
         if encoding_noise is not None and encoding_noise > 0:
-            noise = tf.random_normal([tf.shape(hidden)[0], encoding_noise])
             in_shape = hidden.shape.as_list()
-            broadcasted = tf.tile(noise[:, None, None, :], [1, in_shape[1], in_shape[2], 1])
-            hidden = tf.concat([hidden, broadcasted], axis=3)
+            noise = tf.random_normal([tf.shape(hidden)[0], in_shape[1], in_shape[2], encoding_noise])
+            hidden = tf.concat([hidden, noise], axis=3)
 
         # Decoder
         for layer in range(layers-1):
