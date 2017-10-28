@@ -4,8 +4,8 @@ from functools import wraps
 import tensorflow as tf
 
 
-def disco_gan(input_A, input_B, generator, discriminator, device_mapping, generator_AB=None, generator_BA=None,
-              discriminator_A=None, discriminator_B=None):
+def disco_gan(input_A, input_B, generator, discriminator, device_mapping, is_training=True, generator_AB=None,
+              generator_BA=None, discriminator_A=None, discriminator_B=None):
     if generator_AB is None:
         generator_AB = generator
 
@@ -29,7 +29,7 @@ def disco_gan(input_A, input_B, generator, discriminator, device_mapping, genera
         return wrapped
 
     return _disco_gan(input_A, input_B, generator_AB, generator_BA, wrap(discriminator_A),
-                      wrap(discriminator_B), device_mapping)
+                      wrap(discriminator_B), device_mapping, is_training)
 
 
 def feature_matching(fake, real, scope="feature_matching"):
@@ -43,7 +43,8 @@ def feature_matching(fake, real, scope="feature_matching"):
         return losses
 
 
-def _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, discriminator_B, device_mapping):
+def _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, discriminator_B, device_mapping,
+               is_training):
     # create and summarize the inputs
     with tf.device(device_mapping.input):
         A = input_A()
@@ -53,34 +54,34 @@ def _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, di
 
     # create and summarize fakes
     with tf.device(device_mapping.genA), tf.variable_scope("genA"):
-        fA = generator_BA(B)
+        fA = generator_BA(B, is_training)
         tf.summary.image("fA", fA)
 
     with tf.device(device_mapping.genB), tf.variable_scope("genB"):
-        fB = generator_AB(A)
+        fB = generator_AB(A, is_training)
         tf.summary.image("fB", fB)
 
     # reconstruction
     with tf.device(device_mapping.genA), tf.variable_scope("genA", reuse=True):
-        rA = generator_BA(fB)
+        rA = generator_BA(fB, is_training)
         tf.summary.image("rA", rA)
 
     with tf.device(device_mapping.genB), tf.variable_scope("genB", reuse=True):
-        rB = generator_AB(fA)
+        rB = generator_AB(fA, is_training)
         tf.summary.image("rB", rB)
 
     # discriminators
     with tf.device(device_mapping.disA), tf.variable_scope("disA"):
-        dfA, dffA = discriminator_A(fA)
+        dfA, dffA = discriminator_A(fA, is_training)
 
     with tf.device(device_mapping.disA), tf.variable_scope("disA", reuse=True):
-        drA, drfA = discriminator_A(A)
+        drA, drfA = discriminator_A(A, is_training)
 
     with tf.device(device_mapping.disB), tf.variable_scope("disB"):
-        dfB, dffB = discriminator_B(fB)
+        dfB, dffB = discriminator_B(fB, is_training)
 
     with tf.device(device_mapping.disB), tf.variable_scope("disB", reuse=True):
-        drB, drfB = discriminator_B(B)
+        drB, drfB = discriminator_B(B, is_training)
 
     # now all the loss terms
     with tf.name_scope("DA_loss"):
