@@ -9,8 +9,8 @@ from disco.models import make_translation_generator, make_discriminator
 
 # CLI
 parser = argparse.ArgumentParser()
-parser.add_argument("--data-dir", default="ckpt", type=str)
-parser.add_argument("--checkpoint-dir", default="", type=str)
+parser.add_argument("--data-dir", default="", type=str)
+parser.add_argument("--checkpoint-dir", default="ckpt", type=str)
 parser.add_argument("--A", default="trainA/*", type=str)
 parser.add_argument("--B", default="trainB/*", type=str)
 parser.add_argument("--epochs", default=100, type=int)
@@ -45,6 +45,7 @@ pB = os.path.join(args.data_dir, args.B)
 
 with tf.Graph().as_default():
     train_disco = disco_gan(input_fn(pA), input_fn(pB), generator, discriminator, devices)
+    saver = tf.train.Saver()
 
     with tf.train.MonitoredTrainingSession(checkpoint_dir=args.checkpoint_dir, save_summaries_steps=25,
                                            config=tf.ConfigProto(allow_soft_placement=True)) as sess:

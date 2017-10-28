@@ -1,4 +1,5 @@
 from collections import namedtuple
+from functools import wraps
 
 import tensorflow as tf
 
@@ -17,7 +18,29 @@ def disco_gan(input_A, input_B, generator, discriminator, device_mapping, genera
     if discriminator_B is None:
         discriminator_B = discriminator
 
-    return _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, discriminator_B, device_mapping)
+    # now, wrap the discriminator to ensure consistent output
+    def wrap(f):
+        @wraps(f)
+        def wrapped(*args, **kwargs):
+            result = f(*args, **kwargs)
+            if not isinstance(result, tuple):
+                return result, []
+            return result
+        return wrapped
+
+    return _disco_gan(input_A, input_B, generator_AB, generator_BA, wrap(discriminator_A),
+                      wrap(discriminator_B), device_mapping)
+
+
+def feature_matching(fake, real, scope="feature_matching"):
+    with tf.name_scope(scope):
+        losses = []
+        for f, r in zip(fake, real):
+            mf = tf.reduce_mean(f, axis=0)
+            mr = tf.reduce_mean(r, axis=0)
+            loss = tf.losses.mean_squared_error(mr, mf, reduction=tf.losses.Reduction.MEAN)
+            losses += [loss]
+        return losses
 
 
 def _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, discriminator_B, device_mapping):
@@ -48,16 +71,16 @@ def _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, di
 
     # discriminators
     with tf.device(device_mapping.disA), tf.variable_scope("disA"):
-        dfA = discriminator_A(fA)
+        dfA, dffA = discriminator_A(fA)
 
     with tf.device(device_mapping.disA), tf.variable_scope("disA", reuse=True):
-        drA = discriminator_A(A)
+        drA, drfA = discriminator_A(A)
 
     with tf.device(device_mapping.disB), tf.variable_scope("disB"):
-        dfB = discriminator_B(fB)
+        dfB, dffB = discriminator_B(fB)
 
     with tf.device(device_mapping.disB), tf.variable_scope("disB", reuse=True):
-        drB = discriminator_B(B)
+        drB, drfB = discriminator_B(B)
 
     # now all the loss terms
     with tf.name_scope("DA_loss"):
@@ -75,16 +98,18 @@ def _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, di
         loss_dB = drB_l + dfB_l
 
     with tf.name_scope("GAB_loss"):
-        dfB_lg = tf.losses.sigmoid_cross_entropy(tf.ones_like(dfB), dfB, scope="discrimination_loss",
-                                                 reduction=tf.losses.Reduction.MEAN)
-        dcB_l= tf.losses.mean_squared_error(B, rB, reduction=tf.losses.Reduction.MEAN, scope="reconstruction_loss")
-        loss_AB = dfB_lg + 0.1*dcB_l
+        gdB_l = tf.losses.sigmoid_cross_entropy(tf.ones_like(dfB), dfB, scope="discrimination_loss",
+                                                reduction=tf.losses.Reduction.MEAN)
+        gfB_l = tf.add_n(feature_matching(dffB, drfB))
+        gcB_l = tf.losses.mean_squared_error(B, rB, reduction=tf.losses.Reduction.MEAN, scope="reconstruction_loss")
+        loss_AB = gfB_l + gdB_l + 0.1*gcB_l
 
     with tf.name_scope("GBA_loss"):
-        dcA_l = tf.losses.mean_squared_error(A, rA, reduction=tf.losses.Reduction.MEAN, scope="reconstruction_loss")
-        dfA_lg = tf.losses.sigmoid_cross_entropy(tf.ones_like(dfA), dfA, scope="discrimination_loss",
-                                                 reduction=tf.losses.Reduction.MEAN)
-        loss_BA = dfA_lg + 0.1*dcA_l
+        gcA_l = tf.losses.mean_squared_error(A, rA, reduction=tf.losses.Reduction.MEAN, scope="reconstruction_loss")
+        gfA_l = tf.add_n(feature_matching(dffB, drfB))
+        gdA_l = tf.losses.sigmoid_cross_entropy(tf.ones_like(dfA), dfA, scope="discrimination_loss",
+                                                reduction=tf.losses.Reduction.MEAN)
+        loss_BA = gfA_l + gdA_l + 0.1*gcA_l
 
     tf.summary.scalar("loss_AB", loss_AB)
     tf.summary.scalar("loss_BA", loss_BA)

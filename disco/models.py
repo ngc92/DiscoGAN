@@ -42,8 +42,10 @@ def make_translation_generator(layers):
 def make_discriminator(layers):
     def discriminator(image):
         hidden = image
+        features = []
         for layer in range(layers):
             hidden = tf.layers.conv2d(hidden, 64 * 2**layer, kernel_size=4, strides=2, activation=lrelu)
+            features += [hidden]
             if layer > 0:
                 hidden = tf.layers.batch_normalization(hidden, training=True)
 
@@ -51,6 +53,6 @@ def make_discriminator(layers):
         total = np.prod(shape.as_list()[1:])
         flat = tf.reshape(hidden, (-1, total))
         final = tf.layers.dense(flat, 1, use_bias=False)
-        return final
+        return final, features
 
     return discriminator
