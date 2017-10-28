@@ -26,7 +26,6 @@ parser.add_argument("--eval", action='store_true')
 parser.add_argument("--out-dir", default="result", type=str)
 
 args = parser.parse_args()
-args.eval = True
 
 generator = make_translation_generator(args.generator_depth)
 discriminator = make_discriminator(args.discriminator_depth)
@@ -54,10 +53,12 @@ if args.eval:
     os.makedirs(os.path.dirname(os.path.join(args.out_dir, args.B)), exist_ok=True)
 
     with tf.Graph().as_default():
-        train_disco = disco_gan(input_fn(pA), input_fn(pB), generator, discriminator, devices, is_training=False)
+        train_disco = disco_gan(input_fn(pA), input_fn(pB), generator, discriminator, devices, 1000, is_training=False)
+        saver = tf.train.Saver()
 
         with tf.train.MonitoredSession(session_creator=tf.train.ChiefSessionCreator(
                 config=tf.ConfigProto(allow_soft_placement=True))) as sess:
+            saver.restore(sess, tf.train.latest_checkpoint(args.checkpoint_dir))
             while True:
                 t = time.time()
                 fA, fB, fnA, fnB = sess.run([train_disco.fakeA, train_disco.fakeB, train_disco.file_name_A,
@@ -78,7 +79,7 @@ else:
                               batch_size=args.batch_size)
 
     with tf.Graph().as_default():
-        train_disco = disco_gan(input_fn(pA), input_fn(pB), generator, discriminator, devices)
+        train_disco = disco_gan(input_fn(pA), input_fn(pB), generator, discriminator, devices, 1000)
         saver = tf.train.Saver()
 
         with tf.train.MonitoredTrainingSession(checkpoint_dir=args.checkpoint_dir, save_summaries_steps=25,

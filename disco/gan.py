@@ -7,7 +7,7 @@ import tensorflow as tf
 DiscoGan = namedtuple("DiscoGan", ["train_step", "realA", "fakeA", "realB", "fakeB", "file_name_A", "file_name_B"])
 
 
-def disco_gan(input_A, input_B, generator, discriminator, device_mapping, is_training=True, generator_AB=None,
+def disco_gan(input_A, input_B, generator, discriminator, device_mapping, curriculum, is_training=True, generator_AB=None,
               generator_BA=None, discriminator_A=None, discriminator_B=None):
     if generator_AB is None:
         generator_AB = generator
@@ -32,7 +32,7 @@ def disco_gan(input_A, input_B, generator, discriminator, device_mapping, is_tra
         return wrapped
 
     return _disco_gan(input_A, input_B, generator_AB, generator_BA, wrap(discriminator_A),
-                      wrap(discriminator_B), device_mapping, is_training)
+                      wrap(discriminator_B), device_mapping, curriculum, is_training)
 
 
 def feature_matching(fake, real, scope="feature_matching"):
@@ -47,7 +47,7 @@ def feature_matching(fake, real, scope="feature_matching"):
 
 
 def _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, discriminator_B, device_mapping,
-               is_training):
+               curriculum, is_training):
     # create and summarize the inputs
     with tf.device(device_mapping.input):
         A, file_A = input_A()
@@ -101,19 +101,22 @@ def _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, di
                                                 reduction=tf.losses.Reduction.MEAN, label_smoothing=0.1)
         loss_dB = drB_l + dfB_l
 
+    rate = tf.cond(tf.greater(tf.train.get_or_create_global_step(), curriculum),
+                   lambda: tf.constant(0.5), lambda: tf.constant(0.01))
+
     with tf.name_scope("GAB_loss"):
         gdB_l = tf.losses.sigmoid_cross_entropy(tf.ones_like(dfB), dfB, scope="discrimination_loss",
                                                 reduction=tf.losses.Reduction.MEAN)
         gfB_l = tf.add_n(feature_matching(dffB, drfB))
         gcB_l = tf.losses.mean_squared_error(B, rB, reduction=tf.losses.Reduction.MEAN, scope="reconstruction_loss")
-        loss_AB = gfB_l + gdB_l + 0.1*gcB_l
+        loss_AB = (gfB_l + gdB_l) * (1.0 - rate) + rate*gcB_l
 
     with tf.name_scope("GBA_loss"):
         gcA_l = tf.losses.mean_squared_error(A, rA, reduction=tf.losses.Reduction.MEAN, scope="reconstruction_loss")
         gfA_l = tf.add_n(feature_matching(dffB, drfB))
         gdA_l = tf.losses.sigmoid_cross_entropy(tf.ones_like(dfA), dfA, scope="discrimination_loss",
                                                 reduction=tf.losses.Reduction.MEAN)
-        loss_BA = gfA_l + gdA_l + 0.1*gcA_l
+        loss_BA = (gfA_l + gdA_l) * (1.0 - rate) + rate*gcA_l
 
     tf.summary.scalar("loss_AB", loss_AB)
     tf.summary.scalar("loss_BA", loss_BA)
