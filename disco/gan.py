@@ -7,8 +7,8 @@ import tensorflow as tf
 DiscoGan = namedtuple("DiscoGan", ["train_step", "realA", "fakeA", "realB", "fakeB", "file_name_A", "file_name_B"])
 
 
-def disco_gan(input_A, input_B, generator, discriminator, device_mapping, curriculum, is_training=True, generator_AB=None,
-              generator_BA=None, discriminator_A=None, discriminator_B=None):
+def disco_gan(input_A, input_B, device_mapping, curriculum, discriminator=None, generator=None, is_training=True,
+              generator_AB=None, generator_BA=None, discriminator_A=None, discriminator_B=None):
     if generator_AB is None:
         generator_AB = generator
 
