@@ -35,6 +35,8 @@ def edm_gan(input, encoder, decoder, transformer, discriminator):
 
     aeA_l = _autoencoder_loss(eA, A, decoder)
     aeB_l = _autoencoder_loss(eB, B, decoder)
+    tf.summary.scalar("loss/autoencode_A", aeA_l)
+    tf.summary.scalar("loss/autoencode_A", aeB_l)
 
     # transformer
     fB = decoder(transformer_ab(eA))
@@ -69,7 +71,7 @@ def edm_gan(input, encoder, decoder, transformer, discriminator):
     rec_loss = rB_l + rA_l
     fool_loss = gA_l + gB_l
 
-    generator_loss = auto_enc_loss + rec_loss + fool_loss
+    generator_loss = 0.5 * auto_enc_loss + 0.5 * rec_loss + fool_loss
 
     # the losses for the discriminator
     dfake_loss = dA_l + dB_l
@@ -253,7 +255,7 @@ with tf.Graph().as_default():
                                            save_summaries_steps=args.summary_interval,
                                            config=tf.ConfigProto(allow_soft_placement=True)) as sess:
         for i in range(100000):
-            if i % 3 == 0:
+            if i % 4 == 0:
                 sess.run(td)
             else:
                 sess.run(tg)
