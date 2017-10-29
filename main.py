@@ -15,6 +15,7 @@ parser.add_argument("--checkpoint-dir", default="ckpt", type=str)
 parser.add_argument("--A", default="trainA/*", type=str)
 parser.add_argument("--B", default="trainB/*", type=str)
 parser.add_argument("--epochs", default=100, type=int)
+parser.add_argument("--curriculum", default=1000, type=int)
 parser.add_argument("--input-threads", default=2, type=int)
 parser.add_argument("--image-size", default=64, type=int)
 parser.add_argument("--batch-size", default=32, type=int)
@@ -60,7 +61,7 @@ if args.eval:
     except: pass
 
     with tf.Graph().as_default():
-        train_disco = disco_gan(input_fn(pA), input_fn(pB), devices, 1000, discriminator=discriminator,
+        train_disco = disco_gan(input_fn(pA), input_fn(pB), devices, args.curriculum, discriminator=discriminator,
                                 generator=generator, is_training=False)
         saver = tf.train.Saver()
 
@@ -87,7 +88,7 @@ else:
                               batch_size=args.batch_size)
 
     with tf.Graph().as_default():
-        train_disco = disco_gan(input_fn(pA), input_fn(pB), devices, 1000, discriminator, generator)
+        train_disco = disco_gan(input_fn(pA), input_fn(pB), devices, args.curriculum, discriminator, generator)
         saver = tf.train.Saver()
 
         with tf.train.MonitoredTrainingSession(checkpoint_dir=args.checkpoint_dir, save_summaries_steps=25,
