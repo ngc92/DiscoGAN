@@ -71,7 +71,7 @@ def edm_gan(input, encoder, decoder, transformer, discriminator):
     rec_loss = rB_l + rA_l
     fool_loss = gA_l + gB_l
 
-    generator_loss = 0.5 * auto_enc_loss + 0.5 * rec_loss + fool_loss
+    generator_loss = 0.1 * auto_enc_loss + 0.1 * rec_loss + fool_loss
 
     # the losses for the discriminator
     dfake_loss = dA_l + dB_l
@@ -186,7 +186,7 @@ def make_encoder(layers, stride=2):
 
 def make_transformer():
     def generator(representation, is_training=True):
-        return tf.layers.conv2d(representation, representation.shape[3], 4, 1, padding="SAME", use_bias=True)
+        return tf.layers.conv2d(representation, representation.shape[3], 1, 1, padding="SAME", use_bias=True)
 
     return generator
 
@@ -249,7 +249,7 @@ def input_fn(p1, p2):
 
 with tf.Graph().as_default():
     tg, td = edm_gan(input_fn(pA, pB), make_encoder(3, 2), make_decoder(3), make_transformer(),
-                          make_discriminator(3))
+                     make_discriminator(3))
 
     with tf.train.MonitoredTrainingSession(checkpoint_dir=args.checkpoint_dir,
                                            save_summaries_steps=args.summary_interval,
