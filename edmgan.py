@@ -1,3 +1,5 @@
+import argparse
+
 import tensorflow as tf
 import numpy as np
 
@@ -6,6 +8,7 @@ def inscope(function, scope):
     reuse = {"value": False}
     def f(*args, **kwargs):
         with tf.variable_scope(scope, reuse=reuse["value"]):
+            reuse["value"] = True
             return function(*args, **kwargs)
     return f
 
@@ -13,13 +16,12 @@ def inscope(function, scope):
 def edm_gan(input, encoder, decoder, transformer, discriminator):
     with tf.device("/cpu:0"):
         A, B = input()
+        tf.summary.image("A", A)
+        tf.summary.image("B", B)
 
     # scoped functions
-    encoder_a = inscope(encoder, "EA")
-    encoder_b = inscope(encoder, "EB")
-
-    decoder_a = inscope(decoder, "DA")
-    decoder_b = inscope(decoder, "DB")
+    encoder = inscope(encoder, "Encoder")
+    decoder = inscope(decoder, "Decoder")
 
     discriminator_a = inscope(discriminator, "CA")
     discriminator_b = inscope(discriminator, "CB")
@@ -28,29 +30,39 @@ def edm_gan(input, encoder, decoder, transformer, discriminator):
     transformer_ba = inscope(transformer, "TBA")
 
     # auto-encoding
-    eA = encoder_a(A)
-    eB = encoder_b(B)
+    eA = encoder(A)
+    eB = encoder(B)
 
-    aeA_l = _autoencoder_loss(eA, A, decoder_a)
-    aeB_l = _autoencoder_loss(eB, B, decoder_b)
+    aeA_l = _autoencoder_loss(eA, A, decoder)
+    aeB_l = _autoencoder_loss(eB, B, decoder)
 
     # transformer
-    fB = decoder_b(transformer_ab(eA))
-
-    fA = decoder_a(transformer_ba(eB))
+    fB = decoder(transformer_ab(eA))
+    fA = decoder(transformer_ba(eB))
+    tf.summary.image("fake_A", fA)
+    tf.summary.image("fake_B", fB)
 
     # discrimination
-    dA_l, gA_l = _discriminate_fake_loss(fA, discriminator_a)
-    dB_l, gB_l = _discriminate_fake_loss(fB, discriminator_b)
+    with tf.device("/gpu:1"):
+        dA_l, gA_l = _discriminate_fake_loss(fA, discriminator_a)
+        dB_l, gB_l = _discriminate_fake_loss(fB, discriminator_b)
+
+    tf.summary.scalar("loss/d_fake_A", dA_l)
+    tf.summary.scalar("loss/d_fake_B", dB_l)
+    tf.summary.scalar("loss/generator_A", gA_l)
+    tf.summary.scalar("loss/generator_B", gB_l)
 
     # reconstruction
-    reB = transformer_ab(encoder_a(fA))
-    reA = transformer_ba(encoder_b(fB))
+    reB = transformer_ab(encoder(fA))
+    reA = transformer_ba(encoder(fB))
+    tf.summary.image("reconstructed_A", decoder(reA))
+    tf.summary.image("reconstructed_B", decoder(reB))
 
     # reconstruction error
     rB_l = tf.losses.mean_squared_error(reB, eB)
     rA_l = tf.losses.mean_squared_error(reA, eA)
-
+    tf.summary.scalar("loss/rec_A", rA_l)
+    tf.summary.scalar("loss/rec_B", rB_l)
 
     # combine the losses for the generative part
     auto_enc_loss = aeA_l + aeB_l
@@ -61,17 +73,24 @@ def edm_gan(input, encoder, decoder, transformer, discriminator):
 
     # the losses for the discriminator
     dfake_loss = dA_l + dB_l
-    drA = discriminator_a(A)
-    drB = discriminator_b(B)
-    dreal_loss = tf.losses.sigmoid_cross_entropy(tf.ones_like(drA), drA) + \
-                 tf.losses.sigmoid_cross_entropy(tf.ones_like(drB), drB)
+    with tf.device("/gpu:1"):
+        drA, _ = discriminator_a(A)
+        drB, _ = discriminator_b(B)
+        drA_l = tf.losses.sigmoid_cross_entropy(tf.ones_like(drA), drA)
+        drB_l = tf.losses.sigmoid_cross_entropy(tf.ones_like(drB), drB)
+
+    tf.summary.scalar("loss/d_real_A", drA_l)
+    tf.summary.scalar("loss/d_real_B", drB_l)
+
+    dreal_loss = drA_l + drB_l
 
     discriminator_loss = dfake_loss + dreal_loss
 
-    generator_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "EA") + \
-                     tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "EB") + \
-                     tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "DA") + \
-                     tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "DB") + \
+    tf.summary.scalar("loss/generator", generator_loss)
+    tf.summary.scalar("loss/discriminator", discriminator_loss)
+
+    generator_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "Encoder") + \
+                     tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "Decoder") + \
                      tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "TAB") + \
                      tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "TBA")
 
@@ -93,13 +112,14 @@ def edm_gan(input, encoder, decoder, transformer, discriminator):
 
 def _autoencoder_loss(encoded, original, decoder):
     decoded = decoder(encoded)
+    tf.summary.image("decoded", decoded)
     return tf.losses.mean_squared_error(decoded, original, reduction=tf.losses.Reduction.MEAN)
 
 
 def _discriminate_fake_loss(fake, discriminator):
-    logits = discriminator(fake)
-    d_loss = tf.losses.sigmoid_cross_entropy(tf.zeros_like(logits), logits)
-    g_loss = tf.losses.sigmoid_cross_entropy(tf.ones_like(logits), logits)
+    logits, _ = discriminator(fake)
+    d_loss = tf.losses.sigmoid_cross_entropy(tf.zeros_like(logits), logits, reduction=tf.losses.Reduction.MEAN)
+    g_loss = tf.losses.sigmoid_cross_entropy(tf.ones_like(logits), logits, reduction=tf.losses.Reduction.MEAN)
 
     return d_loss, g_loss
 
@@ -195,16 +215,38 @@ def make_discriminator(layers):
 
 
 ########################################################################################################################
-from .input import input_pipeline, convert_image, crop_and_resize_image, augment_with_flips
+from disco.input import input_pipeline, convert_image, crop_and_resize_image, augment_with_flips
 import os
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--data-dir", default="", type=str)
+parser.add_argument("--checkpoint-dir", default="ckpt", type=str)
+parser.add_argument("--A", default="trainA/*", type=str)
+parser.add_argument("--B", default="trainB/*", type=str)
+parser.add_argument("--epochs", default=100, type=int)
+parser.add_argument("--curriculum", default=1000, type=int)
+parser.add_argument("--input-threads", default=2, type=int)
+parser.add_argument("--image-size", default=64, type=int)
+parser.add_argument("--batch-size", default=32, type=int)
+parser.add_argument("--GPUs", default=1, type=int)
+parser.add_argument("--generator-depth", default=3, type=int)
+parser.add_argument("--discriminator-depth", default=3, type=int)
+parser.add_argument("--summary-interval", default=100, type=int)
+
+args = parser.parse_args()
+
 preprocess = crop_and_resize_image("min", 64) | augment_with_flips() | convert_image()
 
 pA = os.path.join(args.data_dir, args.A)
 pB = os.path.join(args.data_dir, args.B)
 
+
 def input_fn(p1, p2):
-    return input_pipeline(p1, preprocess, num_threads=4, epochs=1000, batch_size=32), \
-           input_pipeline(p2, preprocess, num_threads=4, epochs=1000, batch_size=32)
+    def f():
+        return input_pipeline(p1, preprocess, num_threads=4, epochs=1000, batch_size=32)()[0], \
+               input_pipeline(p2, preprocess, num_threads=4, epochs=1000, batch_size=32)()[0]
+    return f
 
 
 with tf.Graph().as_default():
@@ -216,6 +258,6 @@ with tf.Graph().as_default():
                                            config=tf.ConfigProto(allow_soft_placement=True)) as sess:
         for i in range(100000):
             if i % 3 == 0:
-                sess.run(train_disco.train_step)
+                sess.run(td)
             else:
-                sess.run(train_disco.train_step)
+                sess.run(tg)
