@@ -59,6 +59,14 @@ def augment_with_flips(horizontal=True, vertical=False):
     return Pipe(f)
 
 
+def augment_with_rotations():
+    def f(image):
+        rotate = tf.random_uniform((), 0, 4, tf.int32)
+        return tf.image.rot90(image, rotate)
+
+    return Pipe(f)
+
+
 def read_image_files(pattern, repeat=1):
     file_names = tf.train.match_filenames_once(pattern)
     file_names = tf.train.string_input_producer(file_names, repeat, shuffle=False, capacity=10)

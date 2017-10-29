@@ -5,7 +5,7 @@ import tensorflow as tf
 import scipy.misc
 
 from disco.gan import disco_gan, DeviceMapping
-from disco.input import input_pipeline, convert_image, crop_and_resize_image, augment_with_flips
+from disco.input import input_pipeline, convert_image, crop_and_resize_image, augment_with_flips, augment_with_rotations
 from disco.models import make_translation_generator, make_discriminator
 
 # CLI
@@ -29,7 +29,8 @@ args = parser.parse_args()
 
 generator = make_translation_generator(args.generator_depth, shortcuts=True)
 discriminator = make_discriminator(args.discriminator_depth)
-preprocess = crop_and_resize_image("min", args.image_size) | augment_with_flips(vertical=True) | convert_image()
+preprocess = crop_and_resize_image("min", args.image_size) | augment_with_flips(vertical=True) |\
+             augment_with_rotations() | convert_image()
 
 if args.GPUs == 0:
     devices = DeviceMapping("/cpu:0", "/cpu:0", "/cpu:0", "/cpu:0", "/cpu:0")
@@ -90,7 +91,7 @@ else:
         train_disco = disco_gan(input_fn(pA), input_fn(pB), devices, 1000, discriminator, generator)
         saver = tf.train.Saver()
 
-        with tf.train.MonitoredTrainingSession(checkpoint_dir=args.checkpoint_dir, save_summaries_steps=25,
+        with tf.train.MonitoredTrainingSession(checkpoint_dir=args.checkpoint_dir, save_summaries_steps=100,
                                                config=tf.ConfigProto(allow_soft_placement=True)) as sess:
             while True:
                 t = time.time()
