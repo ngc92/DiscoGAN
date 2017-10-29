@@ -22,6 +22,7 @@ parser.add_argument("--batch-size", default=32, type=int)
 parser.add_argument("--GPUs", default=1, type=int)
 parser.add_argument("--generator-depth", default=3, type=int)
 parser.add_argument("--discriminator-depth", default=3, type=int)
+parser.add_argument("--summary-interval", default=100, type=int)
 # eval mode
 parser.add_argument("--eval", action='store_true')
 parser.add_argument("--out-dir", default="result", type=str)
@@ -92,7 +93,8 @@ else:
         train_disco = disco_gan(input_fn(pA), input_fn(pB), devices, args.curriculum, discriminator, generator)
         saver = tf.train.Saver()
 
-        with tf.train.MonitoredTrainingSession(checkpoint_dir=args.checkpoint_dir, save_summaries_steps=100,
+        with tf.train.MonitoredTrainingSession(checkpoint_dir=args.checkpoint_dir,
+                                               save_summaries_steps=args.summary_interval,
                                                config=tf.ConfigProto(allow_soft_placement=True)) as sess:
             while True:
                 t = time.time()
