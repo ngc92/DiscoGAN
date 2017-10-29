@@ -110,17 +110,19 @@ def _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, di
     optimizer_G = tf.train.AdamOptimizer(learning_rate=0.0002, beta1=0.5, beta2=0.999)
     optimizer_D = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.999)
 
-    # TODO even with graph gated gradients, this is not completely deterministic
     # Their code on GitHub uses only two distinct optimizers.
-    opt_G = optimizer_G.minimize(loss_AB + loss_BA, var_list=var_GAB + var_GBA, colocate_gradients_with_ops=True,
-                                 gate_gradients=tf.train.Optimizer.GATE_GRAPH)
-    opt_D = optimizer_D.minimize(loss_dB + loss_dA, var_list=var_DB + var_DA,
-                                 global_step=tf.train.get_or_create_global_step(),
-                                 colocate_gradients_with_ops=True, gate_gradients=tf.train.Optimizer.GATE_GRAPH)
+    def optimize_generator():
+        return optimizer_G.minimize(loss_AB + loss_BA, var_list=var_GAB + var_GBA, colocate_gradients_with_ops=True)
+
+    def optimize_discriminator():
+        return optimizer_D.minimize(loss_dB + loss_dA, var_list=var_DB + var_DA)
 
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     with tf.control_dependencies(update_ops):
-        train_step = tf.group(opt_G, opt_D)
+        train_step = tf.cond(tf.equal(tf.train.get_or_create_global_step() % 3, 0),
+                             optimize_discriminator, optimize_generator)
+        with tf.control_dependencies([train_step]):
+            train_step = tf.train.get_global_step().assign_add(1)
 
     return DiscoGan(train_step=train_step, realA=A, realB=B, fakeA=fA, fakeB=fB, file_name_A=file_A, file_name_B=file_B)
 
@@ -130,21 +132,16 @@ def _discriminator_loss(logits_fake, logits_real, scope):
         fake_loss = tf.losses.sigmoid_cross_entropy(tf.zeros_like(logits_fake), logits=logits_fake, scope="fake_loss",
                                                     reduction=tf.losses.Reduction.MEAN)
         tf.summary.scalar("fake", fake_loss)
-        tf.summary.scalar("fake_accuracy", _accuracy(logits_fake, tf.zeros_like(logits_fake)))
+        tf.summary.scalar("fake_p", tf.reduce_mean(tf.nn.sigmoid(logits_fake)))
 
         real_loss = tf.losses.sigmoid_cross_entropy(tf.ones_like(logits_real), logits_real, scope="real_loss",
                                                     reduction=tf.losses.Reduction.MEAN, label_smoothing=0.1)
         tf.summary.scalar("real", real_loss)
-        tf.summary.scalar("real_accuracy", _accuracy(logits_real, tf.ones_like(logits_real)))
+        tf.summary.scalar("real_p", tf.reduce_mean(tf.nn.sigmoid(logits_real)))
 
         total = real_loss + fake_loss
         tf.summary.scalar("total", total)
     return total
-
-
-def _accuracy(logits, labels):
-    equal = tf.equal(tf.round(tf.nn.sigmoid(logits)), labels)
-    return tf.reduce_mean(tf.cast(equal, tf.float32))
 
 
 def _generator_loss(discriminator_logit, fake_features, real_features, real, reconstructed, rate, scope):
