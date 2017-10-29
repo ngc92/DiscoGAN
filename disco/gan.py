@@ -87,28 +87,14 @@ def _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, di
         drB, drfB = discriminator_B(B, is_training)
 
     # now all the loss terms
-    with tf.name_scope("DA_loss"):
-        dfA_l = tf.losses.sigmoid_cross_entropy(tf.zeros_like(dfA), logits=dfA, scope="fake_loss",
-                                                reduction=tf.losses.Reduction.MEAN)
-        drA_l = tf.losses.sigmoid_cross_entropy(tf.ones_like(drA), drA, scope="real_loss",
-                                                reduction=tf.losses.Reduction.MEAN, label_smoothing=0.1)
-        loss_dA = drA_l + dfA_l
-
-    with tf.name_scope("DB_loss"):
-        dfB_l = tf.losses.sigmoid_cross_entropy(tf.zeros_like(dfB), dfB, scope="fake_loss",
-                                                reduction=tf.losses.Reduction.MEAN)
-        drB_l = tf.losses.sigmoid_cross_entropy(tf.ones_like(drB), drB, scope="real_loss",
-                                                reduction=tf.losses.Reduction.MEAN, label_smoothing=0.1)
-        loss_dB = drB_l + dfB_l
+    loss_dA = _discriminator_loss(dfA, drA, "DA_loss")
+    loss_dB = _discriminator_loss(dfB, drB, "DB_loss")
 
     rate = tf.cond(tf.greater(tf.train.get_or_create_global_step(), curriculum),
                    lambda: tf.constant(0.5), lambda: tf.constant(0.01))
 
     loss_AB = _generator_loss(dfB, dffB, drfB, B, rB, rate, "GAB_loss")
     loss_BA = _generator_loss(dfA, dffA, drfA, A, rA, rate, "GBA_loss")
-
-    tf.summary.scalar("loss_dA", loss_dA)
-    tf.summary.scalar("loss_dB", loss_dB)
 
     tf.summary.histogram("dfA", dfA)
     tf.summary.histogram("drA", drA)
@@ -137,6 +123,28 @@ def _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, di
         train_step = tf.group(opt_AB, opt_BA, opt_DA, opt_DB)
 
     return DiscoGan(train_step=train_step, realA=A, realB=B, fakeA=fA, fakeB=fB, file_name_A=file_A, file_name_B=file_B)
+
+
+def _discriminator_loss(logits_fake, logits_real, scope):
+    with tf.name_scope(scope):
+        fake_loss = tf.losses.sigmoid_cross_entropy(tf.zeros_like(logits_fake), logits=logits_fake, scope="fake_loss",
+                                                    reduction=tf.losses.Reduction.MEAN)
+        tf.summary.scalar("fake", fake_loss)
+        tf.summary.scalar("fake_accuracy", _accuracy(logits_fake, tf.zeros_like(logits_fake)))
+
+        real_loss = tf.losses.sigmoid_cross_entropy(tf.ones_like(logits_real), logits_real, scope="real_loss",
+                                                    reduction=tf.losses.Reduction.MEAN, label_smoothing=0.1)
+        tf.summary.scalar("real", real_loss)
+        tf.summary.scalar("real_accuracy", _accuracy(logits_fake, tf.zeros_like(logits_fake)))
+
+        total = real_loss + fake_loss
+        tf.summary.scalar("total", total)
+    return total
+
+
+def _accuracy(logits, labels):
+    equal = tf.equal(tf.round(tf.nn.sigmoid(logits)), labels)
+    return tf.reduce_mean(tf.cast(equal, tf.float32))
 
 
 def _generator_loss(discriminator_logit, fake_features, real_features, real, reconstructed, rate, scope):

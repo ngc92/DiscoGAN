@@ -91,7 +91,7 @@ else:
         train_disco = disco_gan(input_fn(pA), input_fn(pB), devices, 10000, discriminator, generator)
         saver = tf.train.Saver()
 
-        with tf.train.MonitoredTrainingSession(checkpoint_dir=args.checkpoint_dir, save_summaries_steps=200,
+        with tf.train.MonitoredTrainingSession(checkpoint_dir=args.checkpoint_dir, save_summaries_steps=100,
                                                config=tf.ConfigProto(allow_soft_placement=True)) as sess:
             while True:
                 t = time.time()
