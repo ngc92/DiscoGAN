@@ -139,7 +139,7 @@ def _discriminator_loss(logits_fake, logits_real, scope):
         tf.summary.scalar("real", real_loss)
         tf.summary.scalar("real_p", tf.reduce_mean(tf.nn.sigmoid(logits_real)))
 
-        total = real_loss + fake_loss
+        total = 0.5 * real_loss + 0.5 * fake_loss
         tf.summary.scalar("total", total)
     return total
 
@@ -160,7 +160,7 @@ def _generator_loss(discriminator_logit, fake_features, real_features, real, rec
                                                       scope="reconstruct")
         tf.summary.scalar("reconstruction", reconstruction)
 
-        total = (feature_matching + 0.1*discrimination) * (1.0 - rate) + rate * reconstruction
+        total = (0.9 * feature_matching + 0.1*discrimination) * (1.0 - rate) + rate * reconstruction
         tf.summary.scalar("total", total)
     return total
 
