@@ -107,20 +107,20 @@ def _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, di
     var_DA = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "disA")
     var_DB = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "disB")
 
-    optimizer_GAB = tf.train.AdamOptimizer(learning_rate=0.0002, beta1=0.5, beta2=0.999)
-    optimizer_GBA = tf.train.AdamOptimizer(learning_rate=0.0002, beta1=0.5, beta2=0.999)
-    optimizer_DA = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.999)
-    optimizer_DB = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.999)
+    optimizer_G = tf.train.AdamOptimizer(learning_rate=0.0002, beta1=0.5, beta2=0.999)
+    optimizer_D = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.999)
 
-    opt_AB = optimizer_GAB.minimize(loss_AB, var_list=var_GAB, colocate_gradients_with_ops=True)
-    opt_BA = optimizer_GBA.minimize(loss_BA, var_list=var_GBA, colocate_gradients_with_ops=True)
-    opt_DA = optimizer_DA.minimize(loss_dA, var_list=var_DA, colocate_gradients_with_ops=True)
-    opt_DB = optimizer_DB.minimize(loss_dB, var_list=var_DB, global_step=tf.train.get_or_create_global_step(),
-                                   colocate_gradients_with_ops=True)
+    # TODO even with graph gated gradients, this is not completely deterministic
+    # Their code on GitHub uses only two distinct optimizers.
+    opt_G = optimizer_G.minimize(loss_AB + loss_BA, var_list=var_GAB + var_GBA, colocate_gradients_with_ops=True,
+                                 gate_gradients=tf.train.Optimizer.GATE_GRAPH)
+    opt_D = optimizer_D.minimize(loss_dB + loss_dA, var_list=var_DB + var_DA,
+                                 global_step=tf.train.get_or_create_global_step(),
+                                 colocate_gradients_with_ops=True, gate_gradients=tf.train.Optimizer.GATE_GRAPH)
 
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     with tf.control_dependencies(update_ops):
-        train_step = tf.group(opt_AB, opt_BA, opt_DA, opt_DB)
+        train_step = tf.group(opt_G, opt_D)
 
     return DiscoGan(train_step=train_step, realA=A, realB=B, fakeA=fA, fakeB=fB, file_name_A=file_A, file_name_B=file_B)
 
