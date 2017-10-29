@@ -135,7 +135,7 @@ def _discriminator_loss(logits_fake, logits_real, scope):
         real_loss = tf.losses.sigmoid_cross_entropy(tf.ones_like(logits_real), logits_real, scope="real_loss",
                                                     reduction=tf.losses.Reduction.MEAN, label_smoothing=0.1)
         tf.summary.scalar("real", real_loss)
-        tf.summary.scalar("real_accuracy", _accuracy(logits_fake, tf.zeros_like(logits_fake)))
+        tf.summary.scalar("real_accuracy", _accuracy(logits_real, tf.ones_like(logits_real)))
 
         total = real_loss + fake_loss
         tf.summary.scalar("total", total)
