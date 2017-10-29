@@ -184,11 +184,7 @@ def make_encoder(layers, stride=2):
 
 def make_transformer():
     def generator(representation, is_training=True):
-        shape = representation.shape
-        total = np.prod(shape.as_list()[1:])
-        flat = tf.reshape(representation, (-1, total))
-        transformed = tf.layers.dense(flat, flat.shape[1])
-        return tf.reshape(transformed, shape)
+        return tf.layers.conv2d(representation, representation.shape[3], 4, 1, padding="SAME", use_bias=True)
 
     return generator
 
