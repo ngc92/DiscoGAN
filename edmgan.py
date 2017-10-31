@@ -13,7 +13,7 @@ def inscope(function, scope):
     return f
 
 
-def edm_gan(input, encoder, decoder, transformer, discriminator):
+def edm_gan(input, encoder, decoder, transformer, discriminator, curriculum):
     with tf.device("/cpu:0"):
         A, B = input()
         tf.summary.image("A", A)
@@ -73,7 +73,9 @@ def edm_gan(input, encoder, decoder, transformer, discriminator):
     rec_loss = rB_l + rA_l
     fool_loss = gA_l + gB_l
 
-    generator_loss = 0.1 * auto_enc_loss + 0.1 * rec_loss + fool_loss
+    ae_weight = tf.cond(tf.less(tf.train.get_or_create_global_step(), curriculum), lambda: tf.constant(1.0),
+                        lambda: tf.constant(0.1))
+    generator_loss = ae_weight * auto_enc_loss + 0.1 * rec_loss + fool_loss
 
     # the losses for the discriminator
     dfake_loss = dA_l + dB_l
@@ -84,6 +86,8 @@ def edm_gan(input, encoder, decoder, transformer, discriminator):
                                                 reduction=tf.losses.Reduction.MEAN)
         drB_l = tf.losses.sigmoid_cross_entropy(tf.ones_like(drB), drB, label_smoothing=0.1,
                                                 reduction=tf.losses.Reduction.MEAN)
+        pA = tf.reduce_mean(tf.nn.sigmoid(drA))
+        pB = tf.reduce_mean(tf.nn.sigmoid(drB))
 
     tf.summary.scalar("loss/d_real_A", drA_l)
     tf.summary.scalar("loss/d_real_B", drB_l)
@@ -194,7 +198,10 @@ def make_encoder(layers, stride=2):
 
 def make_transformer():
     def generator(representation, is_training=True):
-        return tf.layers.conv2d(representation, representation.shape[3], 1, 1, padding="SAME", use_bias=True)
+        hidden = tf.layers.conv2d(representation, representation.shape[3], 1, 1, padding="SAME", use_bias=False,
+                                  activation=lrelu)
+        return tf.layers.conv2d(hidden, representation.shape[3], 1, 1, padding="SAME", use_bias=False,
+                                activation=lrelu)
 
     return generator
 
@@ -250,14 +257,14 @@ pB = os.path.join(args.data_dir, args.B)
 
 def input_fn(p1, p2):
     def f():
-        return input_pipeline(p1, preprocess, num_threads=4, epochs=1000, batch_size=32)()[0], \
-               input_pipeline(p2, preprocess, num_threads=4, epochs=1000, batch_size=32)()[0]
+        return input_pipeline(p1, preprocess, num_threads=4, epochs=10000, batch_size=32)()[0], \
+               input_pipeline(p2, preprocess, num_threads=4, epochs=10000, batch_size=32)()[0]
     return f
 
 
 with tf.Graph().as_default():
     tg, td = edm_gan(input_fn(pA, pB), make_encoder(3, 2), make_decoder(3), make_transformer(),
-                     make_discriminator(3))
+                     make_discriminator(3), args.curriculum)
 
     with tf.train.MonitoredTrainingSession(checkpoint_dir=args.checkpoint_dir,
                                            save_summaries_steps=args.summary_interval,
