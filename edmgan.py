@@ -36,7 +36,7 @@ def edm_gan(input, encoder, decoder, transformer, discriminator):
     aeA_l = _autoencoder_loss(eA, A, decoder)
     aeB_l = _autoencoder_loss(eB, B, decoder)
     tf.summary.scalar("loss/autoencode_A", aeA_l)
-    tf.summary.scalar("loss/autoencode_A", aeB_l)
+    tf.summary.scalar("loss/autoencode_B", aeB_l)
 
     # transformer
     fB = decoder(transformer_ab(eA))
@@ -46,13 +46,15 @@ def edm_gan(input, encoder, decoder, transformer, discriminator):
 
     # discrimination
     with tf.device("/gpu:1"):
-        dA_l, gA_l = _discriminate_fake_loss(fA, discriminator_a)
-        dB_l, gB_l = _discriminate_fake_loss(fB, discriminator_b)
+        dA_l, gA_l, pA = _discriminate_fake_loss(fA, discriminator_a)
+        dB_l, gB_l, pB = _discriminate_fake_loss(fB, discriminator_b)
 
     tf.summary.scalar("loss/d_fake_A", dA_l)
     tf.summary.scalar("loss/d_fake_B", dB_l)
     tf.summary.scalar("loss/generator_A", gA_l)
     tf.summary.scalar("loss/generator_B", gB_l)
+    tf.summary.scalar("discriminate/fake_A", pA)
+    tf.summary.scalar("discriminate/fake_B", pB)
 
     # reconstruction
     reB = transformer_ab(encoder(fA))
@@ -61,8 +63,8 @@ def edm_gan(input, encoder, decoder, transformer, discriminator):
     tf.summary.image("reconstructed_B", decoder(reB))
 
     # reconstruction error
-    rB_l = tf.losses.mean_squared_error(reB, eB)
-    rA_l = tf.losses.mean_squared_error(reA, eA)
+    rB_l = tf.losses.mean_squared_error(reB, eB, reduction=tf.losses.Reduction.MEAN)
+    rA_l = tf.losses.mean_squared_error(reA, eA, reduction=tf.losses.Reduction.MEAN)
     tf.summary.scalar("loss/rec_A", rA_l)
     tf.summary.scalar("loss/rec_B", rB_l)
 
@@ -78,11 +80,15 @@ def edm_gan(input, encoder, decoder, transformer, discriminator):
     with tf.device("/gpu:1"):
         drA, _ = discriminator_a(A)
         drB, _ = discriminator_b(B)
-        drA_l = tf.losses.sigmoid_cross_entropy(tf.ones_like(drA), drA)
-        drB_l = tf.losses.sigmoid_cross_entropy(tf.ones_like(drB), drB)
+        drA_l = tf.losses.sigmoid_cross_entropy(tf.ones_like(drA), drA, label_smoothing=0.1,
+                                                reduction=tf.losses.Reduction.MEAN)
+        drB_l = tf.losses.sigmoid_cross_entropy(tf.ones_like(drB), drB, label_smoothing=0.1,
+                                                reduction=tf.losses.Reduction.MEAN)
 
     tf.summary.scalar("loss/d_real_A", drA_l)
     tf.summary.scalar("loss/d_real_B", drB_l)
+    tf.summary.scalar("discriminate/real_A", pA)
+    tf.summary.scalar("discriminate/real_B", pB)
 
     dreal_loss = drA_l + drB_l
 
@@ -123,7 +129,9 @@ def _discriminate_fake_loss(fake, discriminator):
     d_loss = tf.losses.sigmoid_cross_entropy(tf.zeros_like(logits), logits, reduction=tf.losses.Reduction.MEAN)
     g_loss = tf.losses.sigmoid_cross_entropy(tf.ones_like(logits), logits, reduction=tf.losses.Reduction.MEAN)
 
-    return d_loss, g_loss
+    fake_p = tf.nn.sigmoid(logits)
+
+    return d_loss, g_loss, tf.reduce_mean(fake_p)
 
 
 ########################################################################################################################
