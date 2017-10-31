@@ -238,7 +238,7 @@ parser.add_argument("--checkpoint-dir", default="ckpt", type=str)
 parser.add_argument("--A", default="trainA/*", type=str)
 parser.add_argument("--B", default="trainB/*", type=str)
 parser.add_argument("--epochs", default=100, type=int)
-parser.add_argument("--curriculum", default=1000, type=int)
+parser.add_argument("--curriculum", default=10000, type=int)
 parser.add_argument("--input-threads", default=2, type=int)
 parser.add_argument("--image-size", default=64, type=int)
 parser.add_argument("--batch-size", default=32, type=int)
@@ -270,7 +270,7 @@ with tf.Graph().as_default():
                                            save_summaries_steps=args.summary_interval,
                                            config=tf.ConfigProto(allow_soft_placement=True)) as sess:
         for i in range(100000):
-            if i % 4 == 0:
+            if i % 10 == 0:
                 sess.run(td)
             else:
                 sess.run(tg)
