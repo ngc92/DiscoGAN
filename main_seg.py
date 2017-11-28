@@ -29,7 +29,7 @@ parser.add_argument("--out-dir", default="result", type=str)
 
 args = parser.parse_args()
 
-generator = make_translation_generator(args.generator_depth, shortcuts=True)
+generator = make_translation_generator(args.generator_depth)
 discriminator = make_discriminator(args.discriminator_depth)
 preprocess = crop_and_resize_image("min", args.image_size) | augment_with_flips(vertical=True) |\
              augment_with_rotations() | convert_image()
