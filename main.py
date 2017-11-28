@@ -14,7 +14,7 @@ parser.add_argument("--data-dir", default="", type=str)
 parser.add_argument("--checkpoint-dir", default="ckpt", type=str)
 parser.add_argument("--A", default="trainA/*", type=str)
 parser.add_argument("--B", default="trainB/*", type=str)
-parser.add_argument("--epochs", default=100, type=int)
+parser.add_argument("--epochs", default=1000, type=int)
 parser.add_argument("--curriculum", default=1000, type=int)
 parser.add_argument("--input-threads", default=2, type=int)
 parser.add_argument("--image-size", default=64, type=int)
@@ -69,7 +69,7 @@ if args.eval:
         with tf.train.MonitoredSession(session_creator=tf.train.ChiefSessionCreator(
                 config=tf.ConfigProto(allow_soft_placement=True))) as sess:
             saver.restore(sess, tf.train.latest_checkpoint(args.checkpoint_dir))
-            while True:
+            while not sess.should_stop():
                 t = time.time()
                 fA, fB, fnA, fnB = sess.run([train_disco.fakeA, train_disco.fakeB, train_disco.file_name_A,
                                              train_disco.file_name_B])
@@ -95,7 +95,7 @@ else:
         with tf.train.MonitoredTrainingSession(checkpoint_dir=args.checkpoint_dir,
                                                save_summaries_steps=args.summary_interval,
                                                config=tf.ConfigProto(allow_soft_placement=True)) as sess:
-            while True:
+            while not sess.should_stop():
                 t = time.time()
                 sess.run(train_disco.train_step)
                 print(time.time() - t)

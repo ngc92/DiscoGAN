@@ -12,12 +12,7 @@ from numbers import Integral
 """
 
 
-def lrelu(x):
-    with tf.name_scope("LReLu"):
-        return tf.maximum(x, 0.2 * x)
-
-
-def make_translation_generator(layers, channels=3, stride=2, encoding_noise=None, shortcuts=False):
+def make_translation_generator(layers, channels=3, stride=2):
     # allow layer dependent stride but if just one is given, use for all layers
     if not isinstance(stride, list):
         stride = [stride] * layers
@@ -25,7 +20,6 @@ def make_translation_generator(layers, channels=3, stride=2, encoding_noise=None
     def generator(image, is_training=True):
         # Encoder
         hidden = image
-        encodings = []
 
         with tf.variable_scope("encoder"):
             for layer in range(layers):
@@ -35,30 +29,18 @@ def make_translation_generator(layers, channels=3, stride=2, encoding_noise=None
                     hidden = tf.layers.batch_normalization(hidden, training=is_training, name="batchnorm%i" % layer)
 
                 # apply the nonlinearity after batch-norm. No idea if this is relevant
-                hidden = lrelu(hidden)
-                encodings += [hidden]
-
-        # add some noise to the encoding
-        # TODO figure out whether this makes sense
-        if encoding_noise is not None and encoding_noise > 0:
-            in_shape = hidden.shape.as_list()
-            noise = tf.random_normal([tf.shape(hidden)[0], in_shape[1], in_shape[2], encoding_noise])
-            hidden = tf.concat([hidden, noise], axis=3)
+                hidden = tf.nn.leaky_relu(hidden)
 
         # Decoder
         with tf.variable_scope("decoder"):
             for layer in range(layers-1):
                 index = layers - layer - 1
-                if layer > 0 and shortcuts:
-                    hidden = tf.concat([hidden, encodings[index]], axis=3)
                 hidden = tf.layers.conv2d_transpose(hidden, 64 * 2**(layers - layer - 2), kernel_size=4,
                                                     strides=stride[index], padding="SAME", use_bias=False,
                                                     name="deconv%i" % layer)
                 hidden = tf.layers.batch_normalization(hidden, training=is_training, name="batchnorm%i" % layer)
                 hidden = tf.nn.relu(hidden)
 
-            if shortcuts:
-                hidden = tf.concat([hidden, encodings[0]], axis=3)
             new_image = tf.layers.conv2d_transpose(hidden, channels, kernel_size=4, strides=stride[0],
                                                    activation=tf.nn.tanh, padding="SAME",
                                                    use_bias=False, name="deconv%i" % layers)
@@ -77,12 +59,10 @@ def make_discriminator(layers):
             if layer > 0:
                 hidden = tf.layers.batch_normalization(hidden, training=is_training, name="batchnorm%i" % layer)
 
-            hidden = lrelu(hidden)
+            hidden = tf.nn.leaky_relu(hidden)
             features += [hidden]
 
-        shape = hidden.shape
-        total = np.prod(shape.as_list()[1:])
-        flat = tf.reshape(hidden, (-1, total))
+        flat = tf.layers.flatten(hidden)
         final = tf.layers.dense(flat, 1, use_bias=False)
         return final, features[1:]
 

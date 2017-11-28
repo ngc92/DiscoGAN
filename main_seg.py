@@ -96,7 +96,7 @@ else:
         with tf.train.MonitoredTrainingSession(checkpoint_dir=args.checkpoint_dir,
                                                save_summaries_steps=args.summary_interval,
                                                config=tf.ConfigProto(allow_soft_placement=True)) as sess:
-            while True:
+            while not sess.should_stop():
                 t = time.time()
                 sess.run(train_disco.train_step)
                 print(time.time() - t)
