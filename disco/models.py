@@ -13,7 +13,7 @@ from numbers import Integral
 
 
 def _image_format(image, data_format):
-    if data_format in {"channels_first", "NCHW"}:
+    if data_format == "channels_first":
         channel_index = 1
         image = tf.transpose(image, [0, 3, 1, 2])
     else:
