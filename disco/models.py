@@ -59,8 +59,8 @@ def make_translation_generator(layers, channels=3, stride=2, data_format="channe
                                                    activation=tf.nn.tanh, padding="SAME",
                                                    use_bias=False, name="deconv%i" % layers, data_format=data_format)
 
-        if data_format in {"channels_first", "NCHW"}:
-            new_image = tf.transpose(new_image, [0, 3, 1, 2])
+        if data_format == "channels_first":
+            new_image = tf.transpose(new_image, [0, 2, 3, 1])
 
         return new_image
 
@@ -102,8 +102,8 @@ def make_unet_generator(layers, features, data_format="channels_last"):
         result = tf.layers.conv2d(hidden, image.shape.as_list()[channel_index], 1, activation=tf.nn.tanh, padding="same",
                                   data_format=data_format)
 
-        if data_format in {"channels_first", "NCHW"}:
-            result = tf.transpose(result, [0, 3, 1, 2])
+        if data_format == "channels_first":
+            result = tf.transpose(result, [0, 2, 3, 1])
 
         return result
 
