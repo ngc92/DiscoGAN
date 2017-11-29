@@ -44,6 +44,11 @@ def crop_and_resize_image(crop_size, image_size):
     return Pipe(f)
 
 
+def thicken():
+    def f(image):
+        return tf.layers.max_pooling2d(tf.expand_dims(image, axis=0), 2, 1, "same")[0, :, :, :]
+
+
 def random_crop(crop_size, image_size=None, seed=None):
     def f(image):
         cropped = tf.random_crop(image, [crop_size, crop_size, 3], seed=seed)

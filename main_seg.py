@@ -6,7 +6,7 @@ import scipy.misc
 
 from disco.gan import disco_gan, DeviceMapping
 from disco.input import input_pipeline, convert_image, crop_and_resize_image, augment_with_flips, \
-    augment_with_rotations, random_crop
+    augment_with_rotations, thicken
 from disco.models import make_translation_generator, make_discriminator, make_unet_generator
 
 # CLI
@@ -30,10 +30,10 @@ parser.add_argument("--out-dir", default="result", type=str)
 
 args = parser.parse_args()
 
-#generator = make_translation_generator(args.generator_depth, data_format="channels_first")
-generator = make_unet_generator(args.generator_depth, 32, data_format="channels_first")
+generator = make_translation_generator(args.generator_depth, data_format="channels_first")
+#generator = make_unet_generator(args.generator_depth, 32, data_format="channels_first")
 discriminator = make_discriminator(args.discriminator_depth, data_format="channels_first")
-preprocess = random_crop(args.image_size) | augment_with_flips(vertical=True) |\
+preprocess = crop_and_resize_image("min", args.image_size) | augment_with_flips(vertical=True) |\
              augment_with_rotations() | convert_image()
 
 if args.GPUs == 0:
@@ -87,12 +87,13 @@ if args.eval:
                     scipy.misc.imsave(fnb, fA)
 
 else:
-    def input_fn(path):
-        return input_pipeline(path, preprocess, num_threads=args.input_threads, epochs=args.epochs,
-                              batch_size=args.batch_size)
+    cell_input_fn = input_pipeline(pA, preprocess, num_threads=args.input_threads, epochs=args.epochs,
+                                   batch_size=args.batch_size)
+    seg_input_fn = input_pipeline(pB, thicken() | preprocess, num_threads=args.input_threads, epochs=args.epochs,
+                                  batch_size=args.batch_size)
 
     with tf.Graph().as_default():
-        train_disco = disco_gan(input_fn(pA), input_fn(pB), devices, args.curriculum, discriminator, generator)
+        train_disco = disco_gan(cell_input_fn, seg_input_fn, devices, args.curriculum, discriminator, generator)
         saver = tf.train.Saver()
 
         with tf.train.MonitoredTrainingSession(checkpoint_dir=args.checkpoint_dir,
