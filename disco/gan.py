@@ -96,8 +96,12 @@ def _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, di
     loss_AB = _generator_loss(dfB, dffB, drfB, B, rB, rate, "GAB_loss")
     loss_BA = _generator_loss(dfA, dffA, drfA, A, rA, rate, "GBA_loss")
 
-    tf.summary.image("gan_gradient/A", tf.gradients(loss_BA, fA)[0])
-    tf.summary.image("gan_gradient/B", tf.gradients(loss_AB, fB)[0])
+    grad_a = tf.gradients(loss_BA, fA)[0]
+    grad_b = tf.gradients(loss_AB, fB)[0]
+    tf.summary.image("gan_gradient/A", grad_a)
+    tf.summary.image("gan_gradient/B", grad_b)
+    tf.summary.scalar("an_gradient/norm_A", tf.nn.l2_loss(grad_a))
+    tf.summary.scalar("an_gradient/norm_B", tf.nn.l2_loss(grad_b))
 
     tf.summary.histogram("dfA", dfA)
     tf.summary.histogram("drA", drA)
