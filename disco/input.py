@@ -88,6 +88,7 @@ def read_image_files(pattern, repeat=1):
     reader = tf.WholeFileReader()
     file_name, image_file = reader.read(file_names)
     image = tf.image.decode_image(image_file, name="decode", channels=3)
+    image.set_shape([None, None, 3])
     return file_name, image
 
 
