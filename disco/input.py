@@ -44,11 +44,14 @@ def crop_and_resize_image(crop_size, image_size):
     return Pipe(f)
 
 
-def random_crop(crop_size, image_size, seed=None):
+def random_crop(crop_size, image_size=None, seed=None):
     def f(image):
         cropped = tf.random_crop(image, [crop_size, crop_size, 3], seed=seed)
-        resized = tf.image.resize_images(cropped, [image_size, image_size])
-        resized.set_shape([image_size, image_size, 3])
+        if image_size is not None:
+            resized = tf.image.resize_images(cropped, [image_size, image_size])
+            resized.set_shape([image_size, image_size, 3])
+        else:
+            resized = cropped
         return tf.cast(resized, tf.uint8)
     return Pipe(f)
 
