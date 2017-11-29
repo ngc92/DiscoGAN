@@ -34,34 +34,36 @@ def crop_and_resize_image(crop_size, image_size):
             cropping = crop_size
 
         cropped = tf.image.resize_image_with_crop_or_pad(image, cropping, cropping)
+        tf.summary.image("cropped", cropped)
         resized = tf.image.resize_images(cropped, [image_size, image_size])
         resized.set_shape([image_size, image_size, 3])
+        tf.summary.image("resized", resized)
         return tf.cast(resized, tf.uint8)
     return Pipe(f)
 
 
-def random_crop(crop_size, image_size):
+def random_crop(crop_size, image_size, seed=None):
     def f(image):
-        cropped = tf.random_crop(image, [crop_size, crop_size, 3])
+        cropped = tf.random_crop(image, [crop_size, crop_size, 3], seed=seed)
         resized = tf.image.resize_images(cropped, [image_size, image_size])
         resized.set_shape([image_size, image_size, 3])
         return tf.cast(resized, tf.uint8)
     return Pipe(f)
 
 
-def augment_with_flips(horizontal=True, vertical=False):
+def augment_with_flips(horizontal=True, vertical=False, seed=None):
     def f(image):
         if horizontal:
-            image = tf.image.random_flip_left_right(image)
+            image = tf.image.random_flip_left_right(image, seed=seed)
         if vertical:
-            image = tf.image.random_flip_up_down(image)
+            image = tf.image.random_flip_up_down(image, seed=None if seed is None else seed+1)
         return image
     return Pipe(f)
 
 
-def augment_with_rotations():
+def augment_with_rotations(seed=None):
     def f(image):
-        rotate = tf.random_uniform((), 0, 4, tf.int32)
+        rotate = tf.random_uniform((), 0, 4, tf.int32, seed=seed)
         return tf.image.rot90(image, rotate)
 
     return Pipe(f)
