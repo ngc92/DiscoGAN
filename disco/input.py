@@ -34,10 +34,10 @@ def crop_and_resize_image(crop_size, image_size):
             cropping = crop_size
 
         cropped = tf.image.resize_image_with_crop_or_pad(image, cropping, cropping)
-        tf.summary.image("cropped", cropped)
+        tf.summary.image("cropped", cropped[None, :, :, :])
         resized = tf.image.resize_images(cropped, [image_size, image_size])
         resized.set_shape([image_size, image_size, 3])
-        tf.summary.image("resized", resized)
+        tf.summary.image("resized", resized[None, :, :, :])
         return tf.cast(resized, tf.uint8)
     return Pipe(f)
 
