@@ -30,8 +30,8 @@ parser.add_argument("--out-dir", default="result", type=str)
 
 args = parser.parse_args()
 
-generator_ab = make_translation_generator(args.generator_depth, data_format="channels_first")
-generator_ba = make_translation_generator(args.generator_depth, data_format="channels_first", channels=1)
+generator_ab = make_translation_generator(args.generator_depth, data_format="channels_first", channels=1)
+generator_ba = make_translation_generator(args.generator_depth, data_format="channels_first")
 #generator = make_unet_generator(args.generator_depth, 32, data_format="channels_first")
 discriminator = make_discriminator(args.discriminator_depth, data_format="channels_first")
 preprocess = crop_and_resize_image("min", args.image_size) | augment_with_flips(vertical=True) |\
