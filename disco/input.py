@@ -55,10 +55,20 @@ def random_crop(crop_size, pad=0, seed=None):
     def f(image):
         channels = image.shape[2]
         if pad != 0:
-            image = tf.pad(image, [(0, 0), (pad, pad), (pad, pad), (0, 0)])
+            image = tf.pad(image, [(pad, pad), (pad, pad), (0, 0)])
         cropped = tf.random_crop(image, [crop_size, crop_size, channels], seed=seed)
         return cropped
     return Pipe(f)
+
+
+def random_brightness_and_contrast(max_delta, lower, upper):
+    def f(image):
+        if max_delta > 0:
+            image = tf.image.random_brightness(image, max_delta)
+
+        tf.image.random_contrast(image, lower, upper)
+
+
 
 
 def augment_with_flips(horizontal=True, vertical=False, seed=None):
