@@ -165,6 +165,15 @@ def _generator_loss(discriminator_logit, fake_features, real_features, real, rec
         # reconstruction loss
         reconstruction = tf.losses.mean_squared_error(real, reconstructed, reduction=tf.losses.Reduction.MEAN,
                                                       scope="reconstruct")
+
+        # scaled down reconstruction
+        with tf.name_scope("scaled_down"):
+            half_reconstructed = tf.layers.average_pooling2d(reconstructed, 2, 2)
+            half_real = tf.layers.average_pooling2d(real, 2, 2)
+            hr = tf.losses.mean_squared_error(half_real, half_reconstructed,
+                                              reduction=tf.losses.Reduction.MEAN, scope="reconstruct")
+            reconstructed += hr
+
         tf.summary.scalar("reconstruction", reconstruction)
 
         total = (feature_matching + 0.1*discrimination) * (1.0 - rate) + rate * reconstruction

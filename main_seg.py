@@ -51,10 +51,10 @@ pA = os.path.join(args.data_dir, args.A)
 pB = os.path.join(args.data_dir, args.B)
 
 if args.eval:
-    def input_fn(path):
-        return input_pipeline(path, crop_and_resize_image("min", args.image_size) | convert_image(),
-                              num_threads=args.input_threads, epochs=1, batch_size=args.batch_size)
-
+    cell_input_fn = input_pipeline(pA, crop_and_resize_image("min", args.image_size) | convert_image(),
+                                   num_threads=args.input_threads, epochs=1, batch_size=args.batch_size)
+    seg_input_fn = input_pipeline(pB, crop_and_resize_image("min", args.image_size) | convert_image(),
+                                  num_threads=args.input_threads, epochs=1, batch_size=args.batch_size, greyscale=True)
 
     # THIS IS EXTREMELY UGLY
     # GET PYTHON 3 WORKING AND WE CAN REMOVE IT
@@ -66,7 +66,7 @@ if args.eval:
     except: pass
 
     with tf.Graph().as_default():
-        train_disco = disco_gan(input_fn(pA), input_fn(pB), devices, args.curriculum, discriminator=discriminator,
+        train_disco = disco_gan(cell_input_fn, seg_input_fn, devices, args.curriculum, discriminator=discriminator,
                                 generator_AB=generator_ab, generator_BA=generator_ba, is_training=False)
         saver = tf.train.Saver()
 
