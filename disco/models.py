@@ -21,14 +21,13 @@ def _image_format(image, data_format):
     return image, channel_index
 
 
-def make_translation_generator(layers, stride=2, data_format="channels_last"):
+def make_translation_generator(layers, channels=3, stride=2, data_format="channels_last"):
     # allow layer dependent stride but if just one is given, use for all layers
     if not isinstance(stride, list):
         stride = [stride] * layers
 
     def generator(image, is_training=True):
         image, channel_index = _image_format(image, data_format)
-        channels = image.shape[channel_index]
 
         # Encoder
         hidden = image

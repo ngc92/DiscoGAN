@@ -30,7 +30,8 @@ parser.add_argument("--out-dir", default="result", type=str)
 
 args = parser.parse_args()
 
-generator = make_translation_generator(args.generator_depth, data_format="channels_first")
+generator_ab = make_translation_generator(args.generator_depth, data_format="channels_first")
+generator_ba = make_translation_generator(args.generator_depth, data_format="channels_first", channels=1)
 #generator = make_unet_generator(args.generator_depth, 32, data_format="channels_first")
 discriminator = make_discriminator(args.discriminator_depth, data_format="channels_first")
 preprocess = crop_and_resize_image("min", args.image_size) | augment_with_flips(vertical=True) |\
@@ -66,7 +67,7 @@ if args.eval:
 
     with tf.Graph().as_default():
         train_disco = disco_gan(input_fn(pA), input_fn(pB), devices, args.curriculum, discriminator=discriminator,
-                                generator=generator, is_training=False)
+                                generator_AB=generator_ab, generator_BA=generator_ba, is_training=False)
         saver = tf.train.Saver()
 
         with tf.train.MonitoredSession(session_creator=tf.train.ChiefSessionCreator(
@@ -93,7 +94,8 @@ else:
                                   batch_size=args.batch_size, greyscale=True)
 
     with tf.Graph().as_default():
-        train_disco = disco_gan(cell_input_fn, seg_input_fn, devices, args.curriculum, discriminator, generator)
+        train_disco = disco_gan(cell_input_fn, seg_input_fn, devices, args.curriculum, discriminator,
+                                generator_AB=generator_ab, generator_BA=generator_ba)
         saver = tf.train.Saver()
 
         with tf.train.MonitoredTrainingSession(checkpoint_dir=args.checkpoint_dir,
