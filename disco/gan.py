@@ -172,7 +172,7 @@ def _generator_loss(discriminator_logit, fake_features, real_features, real, rec
             half_real = tf.layers.average_pooling2d(real, 2, 2)
             hr = tf.losses.mean_squared_error(half_real, half_reconstructed,
                                               reduction=tf.losses.Reduction.MEAN, scope="reconstruct")
-            reconstructed += hr
+            reconstruction += hr
 
         tf.summary.scalar("reconstruction", reconstruction)
 
