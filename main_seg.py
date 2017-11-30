@@ -7,7 +7,7 @@ import scipy.misc
 
 from disco.gan import disco_gan, DeviceMapping
 from disco.input import input_pipeline, convert_image, crop_and_resize_image, augment_with_flips, \
-    augment_with_rotations, thicken
+    augment_with_rotations, thicken, random_crop
 from disco.models import make_translation_generator, make_discriminator, make_unet_generator
 
 # CLI
@@ -35,8 +35,8 @@ generator_ab = make_translation_generator(args.generator_depth, data_format="cha
 generator_ba = make_translation_generator(args.generator_depth, data_format="channels_first")
 #generator = make_unet_generator(args.generator_depth, 32, data_format="channels_first")
 discriminator = make_discriminator(args.discriminator_depth, data_format="channels_first")
-preprocess = crop_and_resize_image("min", args.image_size) | augment_with_flips(vertical=True) |\
-             augment_with_rotations() | convert_image()
+preprocess = random_crop(512, 32) | crop_and_resize_image("min", args.image_size) | \
+             augment_with_flips(vertical=True) | augment_with_rotations() | convert_image()
 
 if args.GPUs == 0:
     devices = DeviceMapping("/cpu:0", "/cpu:0", "/cpu:0", "/cpu:0", "/cpu:0")

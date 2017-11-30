@@ -51,16 +51,13 @@ def thicken():
     return Pipe(f)
 
 
-def random_crop(crop_size, image_size=None, seed=None):
+def random_crop(crop_size, pad=0, seed=None):
     def f(image):
         channels = image.shape[2]
+        if pad != 0:
+            image = tf.pad(image, [(0, 0), (pad, pad), (pad, pad), (0, 0)])
         cropped = tf.random_crop(image, [crop_size, crop_size, channels], seed=seed)
-        if image_size is not None:
-            resized = tf.image.resize_images(cropped, [image_size, image_size])
-            resized.set_shape([image_size, image_size, channels])
-        else:
-            resized = cropped
-        return tf.cast(resized, tf.uint8)
+        return cropped
     return Pipe(f)
 
 
