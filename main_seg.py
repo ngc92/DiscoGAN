@@ -35,9 +35,6 @@ generator_ab = make_translation_generator(args.generator_depth, data_format="cha
 generator_ba = make_translation_generator(args.generator_depth, data_format="channels_first")
 #generator = make_unet_generator(args.generator_depth, 32, data_format="channels_first")
 discriminator = make_discriminator(args.discriminator_depth, data_format="channels_first")
-preprocess = random_crop(512, 32) | crop_and_resize_image("min", args.image_size) | \
-             augment_with_flips(vertical=True) | augment_with_rotations() | augment_contrast(0.33, 0.5, 2.0) |\
-             convert_image()
 
 if args.GPUs == 0:
     devices = DeviceMapping("/cpu:0", "/cpu:0", "/cpu:0", "/cpu:0", "/cpu:0")
@@ -90,8 +87,11 @@ if args.eval:
                     scipy.misc.imsave(fnb, np.squeeze(fA))
 
 else:
-    cell_input_fn = input_pipeline(pA, preprocess, num_threads=args.input_threads, epochs=args.epochs,
-                                   batch_size=args.batch_size)
+    preprocess = random_crop(512, 32) | crop_and_resize_image("min", args.image_size) | \
+                 augment_with_flips(vertical=True) | augment_with_rotations() | convert_image()
+
+    cell_input_fn = input_pipeline(pA, augment_contrast(0.33, 0.33, 1.25) | preprocess, num_threads=args.input_threads,
+                                   epochs=args.epochs, batch_size=args.batch_size)
     seg_input_fn = input_pipeline(pB, thicken() | preprocess, num_threads=args.input_threads, epochs=args.epochs,
                                   batch_size=args.batch_size, greyscale=True)
 
