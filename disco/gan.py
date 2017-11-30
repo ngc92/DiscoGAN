@@ -180,7 +180,7 @@ def _generator_loss(discriminator_logit, fake_features, real_features, real, rec
         tf.summary.scalar("feature_matching", feature_matching)
 
         # reconstruction loss
-        reconstruction = _hierarchical_reconstruction_matching(real, reconstructed, "reconstruct")
+        reconstruction = _hierarchical_reconstruction_matching(real, reconstructed, 3, "reconstruct")
         tf.summary.scalar("reconstruction", reconstruction)
 
         total = (feature_matching + 0.1*discrimination) * (1.0 - rate) + rate * reconstruction
