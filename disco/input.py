@@ -61,14 +61,15 @@ def random_crop(crop_size, pad=0, seed=None):
     return Pipe(f)
 
 
-def random_brightness_and_contrast(max_delta, lower, upper):
+def augment_contrast(max_delta=0.0, lower=1.0, upper=1.0):
     def f(image):
         if max_delta > 0:
             image = tf.image.random_brightness(image, max_delta)
 
-        tf.image.random_contrast(image, lower, upper)
-
-
+        if lower != 1.0 or upper != 1.0:
+            image = tf.image.random_contrast(image, lower, upper)
+        return image
+    return Pipe(f)
 
 
 def augment_with_flips(horizontal=True, vertical=False, seed=None):
