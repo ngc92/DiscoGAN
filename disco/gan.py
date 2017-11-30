@@ -46,6 +46,22 @@ def _feature_matching(fake, real, scope="feature_matching"):
         return losses
 
 
+def _hierarchical_reconstruction_matching(real, reconstructed, scales, name=None):
+    assert scales >= 1
+    with tf.name_scope(name, "hierarchical_reconstruction_loss", [real, reconstructed]):
+        # reconstruction loss
+        losses = []
+        for i in range(scales):
+            if i != 0:
+                reconstructed = tf.layers.average_pooling2d(reconstructed, 2, 2)
+                real = tf.layers.average_pooling2d(real, 2, 2)
+            r_loss = tf.losses.mean_squared_error(real, reconstructed, reduction=tf.losses.Reduction.MEAN,
+                                                  scope="reconstruct_%i" % i)
+            losses.append(r_loss)
+
+        return tf.add_n(losses) / float(scales)
+
+
 def _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, discriminator_B, device_mapping,
                curriculum, is_training):
     # create and summarize the inputs
@@ -96,6 +112,7 @@ def _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, di
     loss_AB = _generator_loss(dfB, dffB, drfB, B, rB, rate, "GAB_loss")
     loss_BA = _generator_loss(dfA, dffA, drfA, A, rA, rate, "GBA_loss")
 
+    # gradient summaries
     grad_a = tf.gradients(loss_BA, fA)[0]
     grad_b = tf.gradients(loss_AB, fB)[0]
     tf.summary.image("gan_gradient/A", grad_a)
@@ -163,22 +180,8 @@ def _generator_loss(discriminator_logit, fake_features, real_features, real, rec
         tf.summary.scalar("feature_matching", feature_matching)
 
         # reconstruction loss
-        reconstruction = tf.losses.mean_squared_error(real, reconstructed, reduction=tf.losses.Reduction.MEAN,
-                                                      scope="reconstruct")
-
-        # scaled down reconstruction
-        with tf.name_scope("scaled_down"):
-            half_reconstructed = tf.layers.average_pooling2d(reconstructed, 2, 2)
-            half_real = tf.layers.average_pooling2d(real, 2, 2)
-            hr = tf.losses.mean_squared_error(half_real, half_reconstructed,
-                                              reduction=tf.losses.Reduction.MEAN, scope="reconstruct")
-            reconstruction += hr
-
+        reconstruction = _hierarchical_reconstruction_matching(real, reconstructed, "reconstruct")
         tf.summary.scalar("reconstruction", reconstruction)
-
-        # reconstruction only makes sense if the images are realistic
-        fake_p = tf.reduce_mean(tf.nn.sigmoid(discriminator_logit))
-        rate *= tf.cond(tf.less(fake_p, 0.1), lambda: 0.1, lambda: 1.0, name="reconstruction_if_good_fake")
 
         total = (feature_matching + 0.1*discrimination) * (1.0 - rate) + rate * reconstruction
         tf.summary.scalar("total", total)
@@ -238,7 +241,6 @@ def unet_gan(input, generator, discriminator, device_mapping, curriculum, is_tra
             train_step = tf.train.get_global_step().assign_add(1)
 
     return DiscoGan(train_step=train_step, realA=A, realB=B, fakeA=fA, fakeB=fB, file_name_A=file_A, file_name_B=file_B)
-
 
 
 DeviceMapping = namedtuple("DeviceMapping", ("input", "genA", "genB", "disA", "disB"))

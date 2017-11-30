@@ -2,6 +2,7 @@ import time
 import os
 import argparse
 import tensorflow as tf
+import numpy as np
 import scipy.misc
 
 from disco.gan import disco_gan, DeviceMapping
@@ -81,11 +82,11 @@ if args.eval:
                 for fA, fB, fnA, fnB in zip(fA, fB, fnA, fnB):
                     fnA = os.path.relpath(fnA.decode(), start=args.data_dir)
                     fna = os.path.join(args.out_dir, fnA)
-                    scipy.misc.imsave(fna, fB)
+                    scipy.misc.imsave(fna, np.squeeze(fB))
 
                     fnB = os.path.relpath(fnB.decode(), start=args.data_dir)
                     fnb = os.path.join(args.out_dir, fnB)
-                    scipy.misc.imsave(fnb, fA)
+                    scipy.misc.imsave(fnb, np.squeeze(fA))
 
 else:
     cell_input_fn = input_pipeline(pA, preprocess, num_threads=args.input_threads, epochs=args.epochs,
