@@ -25,6 +25,7 @@ def convert_image():
 
 def crop_and_resize_image(crop_size, image_size):
     def f(image):
+        channels = image.shape[2]
         # cropping and resizing
         if crop_size == "min":
             cropping = tf.minimum(tf.shape(image)[0], tf.shape(image)[1])
@@ -38,7 +39,7 @@ def crop_and_resize_image(crop_size, image_size):
         tf.summary.image("cropped", cropped[None, :, :, :])
         with tf.name_scope("resize"):
             resized = tf.image.resize_images(cropped, [image_size, image_size])
-            resized.set_shape([image_size, image_size, 3])
+            resized.set_shape([image_size, image_size, channels])
         tf.summary.image("resized", resized[None, :, :, :])
         return tf.cast(resized, tf.uint8)
     return Pipe(f)
@@ -52,10 +53,11 @@ def thicken():
 
 def random_crop(crop_size, image_size=None, seed=None):
     def f(image):
-        cropped = tf.random_crop(image, [crop_size, crop_size, 3], seed=seed)
+        channels = image.shape[2]
+        cropped = tf.random_crop(image, [crop_size, crop_size, channels], seed=seed)
         if image_size is not None:
             resized = tf.image.resize_images(cropped, [image_size, image_size])
-            resized.set_shape([image_size, image_size, 3])
+            resized.set_shape([image_size, image_size, channels])
         else:
             resized = cropped
         return tf.cast(resized, tf.uint8)
@@ -82,20 +84,21 @@ def augment_with_rotations(seed=None):
     return Pipe(f)
 
 
-def read_image_files(pattern, repeat=1):
+def read_image_files(pattern, repeat=1, greyscale=False):
     file_names = tf.train.match_filenames_once(pattern)
     file_names = tf.train.string_input_producer(file_names, repeat, shuffle=False, capacity=10)
     reader = tf.WholeFileReader()
     file_name, image_file = reader.read(file_names)
-    image = tf.image.decode_image(image_file, name="decode", channels=3)
-    image.set_shape([None, None, 3])
+    channels = 1 if greyscale else 3
+    image = tf.image.decode_image(image_file, name="decode", channels=channels)
+    image.set_shape([None, None, channels])
     return file_name, image
 
 
-def input_pipeline(pattern, preprocessing, batch_size=32, num_threads=2, epochs=100):
+def input_pipeline(pattern, preprocessing, greyscale=False, batch_size=32, num_threads=2, epochs=100):
     def input_fn():
         with tf.variable_scope("input_fn"):
-            file_name, image = read_image_files(pattern, epochs)
+            file_name, image = read_image_files(pattern, epochs, greyscale=greyscale)
 
             image = preprocessing(image)
             return tf.train.shuffle_batch([image, file_name], batch_size=batch_size, capacity=200, min_after_dequeue=10,

@@ -114,7 +114,7 @@ def _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, di
     var_DA = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "disA")
     var_DB = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "disB")
 
-    optimizer_G = tf.train.AdamOptimizer(learning_rate=0.0002, beta1=0.5, beta2=0.999)
+    optimizer_G = tf.train.AdamOptimizer(learning_rate=0.0005, beta1=0.5, beta2=0.999)
     optimizer_D = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.999)
 
     # Their code on GitHub uses only two distinct optimizers.

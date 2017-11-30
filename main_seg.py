@@ -90,7 +90,7 @@ else:
     cell_input_fn = input_pipeline(pA, preprocess, num_threads=args.input_threads, epochs=args.epochs,
                                    batch_size=args.batch_size)
     seg_input_fn = input_pipeline(pB, thicken() | preprocess, num_threads=args.input_threads, epochs=args.epochs,
-                                  batch_size=args.batch_size)
+                                  batch_size=args.batch_size, greyscale=True)
 
     with tf.Graph().as_default():
         train_disco = disco_gan(cell_input_fn, seg_input_fn, devices, args.curriculum, discriminator, generator)
@@ -99,6 +99,7 @@ else:
         with tf.train.MonitoredTrainingSession(checkpoint_dir=args.checkpoint_dir,
                                                save_summaries_steps=args.summary_interval,
                                                config=tf.ConfigProto(allow_soft_placement=True)) as sess:
+
             while not sess.should_stop():
                 t = time.time()
                 sess.run(train_disco.train_step)
