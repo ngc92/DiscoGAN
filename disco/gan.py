@@ -176,6 +176,10 @@ def _generator_loss(discriminator_logit, fake_features, real_features, real, rec
 
         tf.summary.scalar("reconstruction", reconstruction)
 
+        # reconstruction only makes sense if the images are realistic
+        fake_p = tf.reduce_mean(tf.nn.sigmoid(discriminator_logit))
+        rate *= tf.cond(tf.less(fake_p, 0.1), 0.1, 1.0, name="reconstruction_if_good_fake")
+
         total = (feature_matching + 0.1*discrimination) * (1.0 - rate) + rate * reconstruction
         tf.summary.scalar("total", total)
     return total
