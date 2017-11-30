@@ -100,8 +100,8 @@ def _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, di
     grad_b = tf.gradients(loss_AB, fB)[0]
     tf.summary.image("gan_gradient/A", grad_a)
     tf.summary.image("gan_gradient/B", grad_b)
-    tf.summary.scalar("an_gradient/norm_A", tf.nn.l2_loss(grad_a))
-    tf.summary.scalar("an_gradient/norm_B", tf.nn.l2_loss(grad_b))
+    tf.summary.scalar("gan_gradient/norm_A", tf.nn.l2_loss(grad_a))
+    tf.summary.scalar("gan_gradient/norm_B", tf.nn.l2_loss(grad_b))
 
     tf.summary.histogram("dfA", dfA)
     tf.summary.histogram("drA", drA)
@@ -122,7 +122,7 @@ def _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, di
         return optimizer_G.minimize(loss_AB + loss_BA, var_list=var_GAB + var_GBA, colocate_gradients_with_ops=True)
 
     def optimize_discriminator():
-        return optimizer_D.minimize(loss_dB + loss_dA, var_list=var_DB + var_DA)
+        return optimizer_D.minimize(loss_dB + loss_dA, var_list=var_DB + var_DA, colocate_gradients_with_ops=True)
 
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     with tf.control_dependencies(update_ops):
