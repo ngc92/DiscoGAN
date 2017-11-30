@@ -50,9 +50,9 @@ pA = os.path.join(args.data_dir, args.A)
 pB = os.path.join(args.data_dir, args.B)
 
 if args.eval:
-    cell_input_fn = input_pipeline(pA, crop_and_resize_image("min", args.image_size) | convert_image(),
+    cell_input_fn = input_pipeline(pA, crop_and_resize_image("min", args.image_size),
                                    num_threads=args.input_threads, epochs=1, batch_size=args.batch_size)
-    seg_input_fn = input_pipeline(pB, crop_and_resize_image("min", args.image_size) | convert_image(),
+    seg_input_fn = input_pipeline(pB, crop_and_resize_image("min", args.image_size),
                                   num_threads=args.input_threads, epochs=1, batch_size=args.batch_size, greyscale=True)
 
     # THIS IS EXTREMELY UGLY
@@ -87,10 +87,12 @@ if args.eval:
                     scipy.misc.imsave(fnb, np.squeeze(fA))
 
 else:
-    preprocess = random_crop(512, 32) | crop_and_resize_image("min", args.image_size) | \
-                 augment_with_flips(vertical=True) | augment_with_rotations() | convert_image()
+    preprocess = random_crop(512, 64) | crop_and_resize_image("min", args.image_size) | \
+                 augment_with_flips(vertical=True) | augment_with_rotations()
 
-    cell_input_fn = input_pipeline(pA, augment_contrast(0.33, 0.33, 1.25) | preprocess, num_threads=args.input_threads,
+    # augmentation with contrast is problemnatic, because we cannot recreate it from the
+    # segmentations.
+    cell_input_fn = input_pipeline(pA, preprocess, num_threads=args.input_threads,
                                    epochs=args.epochs, batch_size=args.batch_size)
     seg_input_fn = input_pipeline(pB, thicken() | preprocess, num_threads=args.input_threads, epochs=args.epochs,
                                   batch_size=args.batch_size, greyscale=True)
