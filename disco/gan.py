@@ -46,7 +46,7 @@ def _feature_matching(fake, real, scope="feature_matching"):
         return losses
 
 
-def _hierarchical_reconstruction_matching(real, reconstructed, scales, name=None):
+def _hierarchical_reconstruction_matching(real, reconstructed, scales, name=None, weights=1.0):
     assert scales >= 1
     with tf.name_scope(name, "hierarchical_reconstruction_loss", [real, reconstructed]):
         # reconstruction loss
@@ -56,7 +56,7 @@ def _hierarchical_reconstruction_matching(real, reconstructed, scales, name=None
                 reconstructed = tf.layers.average_pooling2d(reconstructed, 2, 2)
                 real = tf.layers.average_pooling2d(real, 2, 2)
             r_loss = tf.losses.mean_squared_error(real, reconstructed, reduction=tf.losses.Reduction.MEAN,
-                                                  scope="reconstruct_%i" % i)
+                                                  scope="reconstruct_%i" % i, weights=weights)
             losses.append(r_loss)
 
         return tf.add_n(losses) / float(scales)
@@ -175,12 +175,18 @@ def _generator_loss(discriminator_logit, fake_features, real_features, real, rec
                                                          scope="discriminate", reduction=tf.losses.Reduction.MEAN)
         tf.summary.scalar("discrimination", discrimination)
 
+        # fake_p
+        # these will be considered fixed values, do not propagate gradient
+        fake_p = tf.nn.sigmoid(tf.stop_gradient(discriminator_logit))
+        per_example_weights = tf.maximum(1.0, 3*fake_p) / tf.shape(discriminator_logit)[0]
+
         # feature matching loss
         feature_matching = tf.add_n(_feature_matching(fake_features, real_features, "matching"))
         tf.summary.scalar("feature_matching", feature_matching)
 
         # reconstruction loss
-        reconstruction = _hierarchical_reconstruction_matching(real, reconstructed, 3, "reconstruct")
+        reconstruction = _hierarchical_reconstruction_matching(real, reconstructed, 3, "reconstruct",
+                                                               weights=per_example_weights)
         tf.summary.scalar("reconstruction", reconstruction)
 
         total = (feature_matching + 0.1*discrimination) * (1.0 - rate) + rate * reconstruction
