@@ -178,7 +178,7 @@ def _generator_loss(discriminator_logit, fake_features, real_features, real, rec
         # fake_p
         # these will be considered fixed values, do not propagate gradient
         fake_p = tf.nn.sigmoid(tf.stop_gradient(discriminator_logit))
-        per_example_weights = tf.maximum(1.0, 3*fake_p) / tf.shape(discriminator_logit)[0]
+        per_example_weights = tf.maximum(1.0, 3.0*fake_p) / tf.shape(discriminator_logit)[0]
 
         # feature matching loss
         feature_matching = tf.add_n(_feature_matching(fake_features, real_features, "matching"))
