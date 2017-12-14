@@ -143,7 +143,12 @@ def _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, di
 
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     with tf.control_dependencies(update_ops):
+        bad_da = tf.reduce_mean(lab_dic["fake_p"])
+        bad_db = tf.reduce_mean(lba_dic["fake_p"])
+        bad = tf.less(tf.minimum(bad_da, bad_db), 0.1)
+        bad = tf.Print(bad, [bad])
         discriminator_step = tf.equal(tf.train.get_or_create_global_step() % 3, 0)
+        discriminator_step = tf.logical_and(discriminator_step, tf.logical_not(bad))
         train_step = tf.cond(discriminator_step, optimize_discriminator, optimize_generator)
         with tf.control_dependencies([train_step]):
             train_step = tf.train.get_global_step().assign_add(1)
@@ -179,7 +184,7 @@ def _generator_loss(discriminator_logit, fake_features, real_features, real, rec
         # these will be considered fixed values, do not propagate gradient
         fake_p = tf.nn.sigmoid(tf.stop_gradient(discriminator_logit))
         fake_p = tf.expand_dims(tf.expand_dims(fake_p, 2), 3)
-        per_example_weights = tf.maximum(1.0, 3.0*fake_p) / tf.cast(tf.shape(discriminator_logit)[0], tf.float32)
+        per_example_weights = tf.maximum(1.0, 3.0*fake_p)
 
         # feature matching loss
         feature_matching = tf.add_n(_feature_matching(fake_features, real_features, "matching"))
@@ -197,7 +202,7 @@ def _generator_loss(discriminator_logit, fake_features, real_features, real, rec
 
         total = discrimination_loss * (1.0 - rate) + rate * reconstruction
         tf.summary.scalar("total", total)
-    return total, {"reconstruction": reconstruction, "discriminate": discrimination_loss}
+    return total, {"reconstruction": reconstruction, "discriminate": discrimination_loss, "fake_p": fake_p}
 
 
 def _generator_gradient_summary(losses, other_fake, fake, reconstructed, name):
