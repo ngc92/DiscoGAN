@@ -192,6 +192,9 @@ def _generator_loss(discriminator_logit, fake_features, real_features, real, rec
 
         discrimination_loss = (feature_matching + 0.1*discrimination)
 
+        rate = rate * tf.reduce_mean(per_example_weights)
+        tf.summary.scalar("rate", rate)
+
         total = discrimination_loss * (1.0 - rate) + rate * reconstruction
         tf.summary.scalar("total", total)
     return total, {"reconstruction": reconstruction, "discriminate": discrimination_loss}
