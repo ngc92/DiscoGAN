@@ -21,7 +21,7 @@ def _image_format(image, data_format):
     return image, channel_index
 
 
-def make_translation_generator(layers, channels=3, stride=2, data_format="channels_last"):
+def make_deconv_generator(layers, channels=3, stride=2, data_format="channels_last"):
     # allow layer dependent stride but if just one is given, use for all layers
     if not isinstance(stride, list):
         stride = [stride] * layers
@@ -51,6 +51,60 @@ def make_translation_generator(layers, channels=3, stride=2, data_format="channe
                 hidden = tf.layers.conv2d_transpose(hidden, 64 * 2**(layers - layer - 2), kernel_size=4,
                                                     strides=stride[index], padding="SAME", use_bias=False,
                                                     name="deconv%i" % layer, data_format=data_format)
+                hidden = tf.layers.batch_normalization(hidden, training=is_training, name="batchnorm%i" % layer,
+                                                       axis=channel_index)
+                hidden = tf.nn.relu(hidden)
+
+            new_image = tf.layers.conv2d_transpose(hidden, channels, kernel_size=4, strides=stride[0],
+                                                   activation=tf.nn.tanh, padding="SAME",
+                                                   use_bias=False, name="deconv%i" % layers, data_format=data_format)
+
+        if data_format == "channels_first":
+            new_image = tf.transpose(new_image, [0, 2, 3, 1])
+
+        return new_image
+
+    return generator
+
+
+def make_upsample_generator(layers, channels=3, stride=2, data_format="channels_last"):
+    # allow layer dependent stride but if just one is given, use for all layers
+    if not isinstance(stride, list):
+        stride = [stride] * layers
+
+    def generator(image, is_training=True):
+        image, channel_index = _image_format(image, data_format)
+
+        # Encoder
+        hidden = image
+
+        with tf.variable_scope("encoder"):
+            for layer in range(layers):
+                hidden = tf.layers.conv2d(hidden, 64 * 2**layer, kernel_size=4, strides=stride[layer],
+                                          padding="SAME", use_bias=False, name="conv%i" % layer,
+                                          data_format=data_format)
+                if layer > 0:
+                    hidden = tf.layers.batch_normalization(hidden, training=is_training, name="batchnorm%i" % layer,
+                                                           axis=channel_index)
+
+                # apply the nonlinearity after batch-norm. No idea if this is relevant
+                hidden = tf.nn.leaky_relu(hidden)
+
+        # Decoder
+        with tf.variable_scope("decoder"):
+            for layer in range(layers-1):
+                index = layers - layer - 1
+                if data_format == "channels_last":
+                    size = (stride[index]*hidden.shape.as_list()[1], stride[index]*hidden.shape.as_list()[2])
+                    hidden = tf.image.resize_images(hidden, size=size, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+                else:
+                    size = (stride[index] * hidden.shape.as_list()[2], stride[index] * hidden.shape.as_list()[3])
+                    hidden = tf.transpose(hidden, [0, 2, 3, 1])
+                    hidden = tf.image.resize_images(hidden, size=size, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+                    hidden = tf.transpose(hidden, [0, 3, 1, 2])
+
+                hidden = tf.layers.conv2d(hidden, 64 * 2**(layers - layer - 2), use_bias=False, padding="same",
+                                          kernel_size=4, strides=1, data_format=data_format)
                 hidden = tf.layers.batch_normalization(hidden, training=is_training, name="batchnorm%i" % layer,
                                                        axis=channel_index)
                 hidden = tf.nn.relu(hidden)

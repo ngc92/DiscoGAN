@@ -8,14 +8,14 @@ import scipy.misc
 from disco.gan import disco_gan, DeviceMapping
 from disco.input import input_pipeline, convert_image, crop_and_resize_image, augment_with_flips, \
     augment_with_rotations, thicken, random_crop, augment_contrast
-from disco.models import make_translation_generator, make_discriminator, make_unet_generator
+from disco.models import make_deconv_generator, make_discriminator, make_unet_generator, make_upsample_generator
 
 # CLI
 parser = argparse.ArgumentParser()
 parser.add_argument("--data-dir", default="", type=str)
 parser.add_argument("--checkpoint-dir", default="ckpt", type=str)
-parser.add_argument("--A", default="trainA/*", type=str)
-parser.add_argument("--B", default="trainB/*", type=str)
+parser.add_argument("--A", default="trainA", type=str)
+parser.add_argument("--B", default="trainB", type=str)
 parser.add_argument("--epochs", default=100, type=int)
 parser.add_argument("--curriculum", default=1000, type=int)
 parser.add_argument("--input-threads", default=2, type=int)
@@ -31,8 +31,8 @@ parser.add_argument("--out-dir", default="result", type=str)
 
 args = parser.parse_args()
 
-generator_ab = make_translation_generator(args.generator_depth, data_format="channels_first", channels=1)
-generator_ba = make_translation_generator(args.generator_depth, data_format="channels_first")
+generator_ab = make_upsample_generator(args.generator_depth, data_format="channels_first", channels=1)
+generator_ba = make_upsample_generator(args.generator_depth, data_format="channels_first", channels=1)
 #generator = make_unet_generator(args.generator_depth, 32, data_format="channels_first")
 discriminator = make_discriminator(args.discriminator_depth, data_format="channels_first")
 
@@ -46,12 +46,13 @@ elif args.GPUs == 4:
     devices = DeviceMapping("/cpu:0", "/gpu:0", "/gpu:1", "/gpu:2", "/gpu:3")
 
 
-pA = os.path.join(args.data_dir, args.A)
-pB = os.path.join(args.data_dir, args.B)
+pA = os.path.join(args.data_dir, args.A, "*")
+pB = os.path.join(args.data_dir, args.B, "*")
+
 
 if args.eval:
     cell_input_fn = input_pipeline(pA, crop_and_resize_image("min", args.image_size),
-                                   num_threads=args.input_threads, epochs=1, batch_size=args.batch_size)
+                                   num_threads=args.input_threads, epochs=1, batch_size=args.batch_size, greyscale=True)
     seg_input_fn = input_pipeline(pB, crop_and_resize_image("min", args.image_size),
                                   num_threads=args.input_threads, epochs=1, batch_size=args.batch_size, greyscale=True)
 
@@ -93,7 +94,7 @@ else:
     # augmentation with contrast is problemnatic, because we cannot recreate it from the
     # segmentations.
     cell_input_fn = input_pipeline(pA, preprocess, num_threads=args.input_threads,
-                                   epochs=args.epochs, batch_size=args.batch_size)
+                                   epochs=args.epochs, batch_size=args.batch_size, greyscale=True)
     seg_input_fn = input_pipeline(pB, thicken() | preprocess, num_threads=args.input_threads, epochs=args.epochs,
                                   batch_size=args.batch_size, greyscale=True)
 
