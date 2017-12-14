@@ -75,19 +75,23 @@ def _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, di
     with tf.device(device_mapping.genA), tf.variable_scope("genA"):
         fA = generator_BA(B, is_training)
         tf.summary.image("fA", fA)
+    fA = tf.identity(fA, "fake_A")
 
     with tf.device(device_mapping.genB), tf.variable_scope("genB"):
         fB = generator_AB(A, is_training)
         tf.summary.image("fB", fB)
+    fB = tf.identity(fB, "fake_B")
 
     # reconstruction
     with tf.device(device_mapping.genA), tf.variable_scope("genA", reuse=True):
         rA = generator_BA(fB, is_training)
         tf.summary.image("rA", rA)
+    rA = tf.identity(rA, "reconstructed_A")
 
     with tf.device(device_mapping.genB), tf.variable_scope("genB", reuse=True):
         rB = generator_AB(fA, is_training)
         tf.summary.image("rB", rB)
+    rB = tf.identity(rB, "reconstructed_B")
 
     # discriminators
     with tf.device(device_mapping.disA), tf.variable_scope("disA"):
@@ -109,16 +113,12 @@ def _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, di
     rate = tf.cond(tf.greater(tf.train.get_or_create_global_step(), curriculum),
                    lambda: tf.constant(0.5), lambda: tf.constant(0.01))
 
-    loss_AB = _generator_loss(dfB, dffB, drfB, B, rB, rate, "GAB_loss")
-    loss_BA = _generator_loss(dfA, dffA, drfA, A, rA, rate, "GBA_loss")
+    loss_AB, lab_dic = _generator_loss(dfB, dffB, drfB, B, rB, rate, "GAB_loss")
+    loss_BA, lba_dic = _generator_loss(dfA, dffA, drfA, A, rA, rate, "GBA_loss")
 
     # gradient summaries
-    grad_a = tf.gradients(loss_BA, fA)[0]
-    grad_b = tf.gradients(loss_AB, fB)[0]
-    tf.summary.image("gan_gradient/A", grad_a)
-    tf.summary.image("gan_gradient/B", grad_b)
-    tf.summary.scalar("gan_gradient/norm_A", tf.nn.l2_loss(grad_a))
-    tf.summary.scalar("gan_gradient/norm_B", tf.nn.l2_loss(grad_b))
+    _generator_gradient_summary(lab_dic, fA, fB, rB, "gradient_AB")
+    _generator_gradient_summary(lba_dic, fB, fA, rA, "gradient_BA")
 
     tf.summary.histogram("dfA", dfA)
     tf.summary.histogram("drA", drA)
@@ -178,6 +178,7 @@ def _generator_loss(discriminator_logit, fake_features, real_features, real, rec
         # fake_p
         # these will be considered fixed values, do not propagate gradient
         fake_p = tf.nn.sigmoid(tf.stop_gradient(discriminator_logit))
+        fake_p = tf.expand_dims(tf.expand_dims(fake_p, 2), 3)
         per_example_weights = tf.maximum(1.0, 3.0*fake_p) / tf.cast(tf.shape(discriminator_logit)[0], tf.float32)
 
         # feature matching loss
@@ -189,9 +190,26 @@ def _generator_loss(discriminator_logit, fake_features, real_features, real, rec
                                                                weights=per_example_weights)
         tf.summary.scalar("reconstruction", reconstruction)
 
-        total = (feature_matching + 0.1*discrimination) * (1.0 - rate) + rate * reconstruction
+        discrimination_loss = (feature_matching + 0.1*discrimination)
+
+        total = discrimination_loss * (1.0 - rate) + rate * reconstruction
         tf.summary.scalar("total", total)
-    return total
+    return total, {"reconstruction": reconstruction, "discriminate": discrimination_loss}
+
+
+def _generator_gradient_summary(losses, other_fake, fake, reconstructed, name):
+    reconstruction = losses["reconstruction"]
+    discriminate = losses["discriminate"]
+    with tf.name_scope(name):
+        grad_r = tf.gradients(reconstruction, other_fake)[0]
+        grad_f = tf.gradients(reconstruction, reconstructed)[0]
+        grad_d = tf.gradients(discriminate, fake)[0]
+        tf.summary.image("rec", grad_r)
+        tf.summary.image("rloss", grad_f)
+        tf.summary.image("dis", grad_d)
+        tf.summary.scalar("norm_rec", tf.nn.l2_loss(grad_r))
+        tf.summary.scalar("norm_dis", tf.nn.l2_loss(grad_d))
+        tf.summary.scalar("norm_rgrad", tf.nn.l2_loss(grad_f))
 
 
 # TODO this does not work yet
