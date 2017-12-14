@@ -146,7 +146,6 @@ def _disco_gan(input_A, input_B, generator_AB, generator_BA, discriminator_A, di
         bad_da = tf.reduce_mean(lab_dic["fake_p"])
         bad_db = tf.reduce_mean(lba_dic["fake_p"])
         bad = tf.less(tf.minimum(bad_da, bad_db), 0.1)
-        bad = tf.Print(bad, [bad])
         discriminator_step = tf.equal(tf.train.get_or_create_global_step() % 3, 0)
         discriminator_step = tf.logical_and(discriminator_step, tf.logical_not(bad))
         train_step = tf.cond(discriminator_step, optimize_discriminator, optimize_generator)

@@ -90,28 +90,31 @@ def make_upsample_generator(layers, channels=3, stride=2, data_format="channels_
                 # apply the nonlinearity after batch-norm. No idea if this is relevant
                 hidden = tf.nn.leaky_relu(hidden)
 
+        def upsample(hidden, index):
+            if data_format == "channels_last":
+                size = (stride[index] * hidden.shape.as_list()[1], stride[index] * hidden.shape.as_list()[2])
+                hidden = tf.image.resize_images(hidden, size=size, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+            else:
+                size = (stride[index] * hidden.shape.as_list()[2], stride[index] * hidden.shape.as_list()[3])
+                hidden = tf.transpose(hidden, [0, 2, 3, 1])
+                hidden = tf.image.resize_images(hidden, size=size, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+                hidden = tf.transpose(hidden, [0, 3, 1, 2])
+            return hidden
+
         # Decoder
         with tf.variable_scope("decoder"):
             for layer in range(layers-1):
                 index = layers - layer - 1
-                if data_format == "channels_last":
-                    size = (stride[index]*hidden.shape.as_list()[1], stride[index]*hidden.shape.as_list()[2])
-                    hidden = tf.image.resize_images(hidden, size=size, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
-                else:
-                    size = (stride[index] * hidden.shape.as_list()[2], stride[index] * hidden.shape.as_list()[3])
-                    hidden = tf.transpose(hidden, [0, 2, 3, 1])
-                    hidden = tf.image.resize_images(hidden, size=size, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
-                    hidden = tf.transpose(hidden, [0, 3, 1, 2])
-
+                hidden = upsample(hidden, index)
                 hidden = tf.layers.conv2d(hidden, 64 * 2**(layers - layer - 2), use_bias=False, padding="same",
                                           kernel_size=4, strides=1, data_format=data_format)
                 hidden = tf.layers.batch_normalization(hidden, training=is_training, name="batchnorm%i" % layer,
                                                        axis=channel_index)
                 hidden = tf.nn.relu(hidden)
 
-            new_image = tf.layers.conv2d_transpose(hidden, channels, kernel_size=4, strides=stride[0],
-                                                   activation=tf.nn.tanh, padding="SAME",
-                                                   use_bias=False, name="deconv%i" % layers, data_format=data_format)
+            hidden = upsample(hidden, 0)
+            new_image = tf.layers.conv2d(hidden, channels, padding="same", activation=tf.nn.tanh, kernel_size=4,
+                                         use_bias=False, name="deconv%i" % layers, data_format=data_format)
 
         if data_format == "channels_first":
             new_image = tf.transpose(new_image, [0, 2, 3, 1])
